@@ -5,11 +5,12 @@
 - **Goal:** SWE interviews, Data engineering work
 - **Depth:** Essentials only
 - **Lab language:** set in Phase 3
+- **Question style:** prefers open / theory questions (explain why, apply to a scenario) over calculation questions
 - **Commit preference:** per-part (commit + push after each part)
 
 ## Status
 - **Phase:** 2-teaching
-- **Current part:** 02: Floating point and text encoding
+- **Current part:** 03: The CPU: instructions, registers and the fetch–decode–execute loop
 - **Current step:** menu
 - **Last updated:** 2026-11-20
 
@@ -18,7 +19,7 @@
 |---|---|---|---|---|---|
 | 01 | Bits, bytes, hex and integers | ✅ Done | 1.5/2 | 1/4 | [notes](notes/01-bits-bytes-integers.md) |
 | 02 | Floating point and text encoding | ✅ Done | 1/2 | — | [notes](notes/02-floats-and-text.md) |
-| 03 | The CPU: instructions, registers and the fetch–decode–execute loop | ⬜ Not started | — | — | — |
+| 03 | The CPU: instructions, registers and the fetch–decode–execute loop | ✅ Done | 1/2 | — | [notes](notes/03-cpu-basics.md) |
 | 04 | The memory hierarchy and caching | ⬜ Not started | — | — | — |
 | 05 | How code runs: compilers, interpreters and VMs | ⬜ Not started | — | — | — |
 | 06 | Stack vs heap | ⬜ Not started | — | — | — |
@@ -37,7 +38,9 @@
 | Overflow can wrap to a positive value | Did not expect a wrapped product to stay positive | Part 1 quiz Q3 | 🔴 Open |
 | UTF-8 byte structure (lead vs continuation bytes); bytes vs characters | Said `E0 B8 81 41` "contains 2 bytes" (it is 4 bytes, 2 characters); could not tell character boundaries or the Latin-1 reading | Part 2 check Q2 | 🔴 Open |
 | Money column type (DECIMAL / BIGINT minor units) | Did not answer which type for money and why | Part 2 check Q1 | 🔴 Open |
-| Answering every part of a question | Skipped second halves: 0x80 (Part 1 quiz Q1), money type (Part 2 Q1), how-to-tell and Latin-1 (Part 2 Q2) | Parts 1–2 | 🔴 Open |
+| Answering every part of a question | Skipped second halves: 0x80 (Part 1 quiz Q1), money type (Part 2 Q1), how-to-tell and Latin-1 (Part 2 Q2), the `if` skip (Part 3 Q1), why never 64× (Part 3 Q2) | Parts 1–3 | 🔴 Open |
+| How jumps change the PC (if/loops at machine level: CMP + flags + conditional jump) | Described the loop but could not explain how the CPU skips an `if` body; said fetch puts the instruction in a data register; thought execute is always the ALU | Part 3 check Q1 | 🔴 Open |
+| Limits of parallelism (Amdahl's law, overhead, shared memory bandwidth); processes vs threads in Python (GIL) | Did not explain why a parallel job never gets 64× faster; suggested "multi thread" for pandas | Part 3 check Q2 | 🔴 Open |
 | Careful binary arithmetic | Wrote 128 + 1 = 120 (method right, arithmetic slip) | Part 1 check Q1 | 🔴 Open |
 
 ## Quiz log
@@ -56,3 +59,5 @@
 - 2026-11-20: Part 1 quick quiz 1/4. New weak spots: int32 range, expression type vs assigned type, positive wrap.
 - 2026-11-20: Started Part 2.
 - 2026-11-20: Part 2 done (check 1/2). Weak spots: UTF-8 byte structure, money column type, answering every part.
+- 2026-11-20: Started Part 3. User asked for open/theory check questions instead of calculation ones; Part 3 questions replaced.
+- 2026-11-20: Part 3 done (check 1/2). Showed an interactive fetch–decode–execute stepper for an `if`. Weak spots: jumps/PC, limits of parallelism.
