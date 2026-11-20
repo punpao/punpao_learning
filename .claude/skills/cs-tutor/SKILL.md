@@ -27,6 +27,10 @@ Arguments passed on invocation (may be empty): `$ARGUMENTS`
    When the environment lets you, run shell/code snippets yourself before showing them, so
    what you give the user actually works.
 6. **Resume, never restart.** If the topic folder exists, continue from `progress.md`.
+7. **Easy English for everything that isn't a technical term.** The user wants easy
+   vocabulary. Keep technical terms exact (see "Plain language" below), but write
+   everything around them in simple, everyday English. This applies to lessons, questions,
+   feedback, notes, the lab, the exam and every file you write.
 
 ## Locating things
 
@@ -247,6 +251,41 @@ Read [references/exam-guide.md](references/exam-guide.md) and follow it.
 - **Focused**: one idea done deeply beats five done shallowly. Point to later parts instead of
   cramming them in.
 - Use Markdown headings, short paragraphs, fenced code blocks and ASCII diagrams in fenced blocks.
+
+### Plain language
+
+- **Keep technical terms.** Use the real names (`page fault`, `context switch`, `mutex`,
+  `three-way handshake`, `isolation level`, `idempotent`) because the user needs them for
+  interviews and documentation. Explain each term in simple words the first time it appears
+  in a part, e.g. "a **race condition** (when the result depends on which thread runs first)".
+- **Use easy words for everything else.** Choose the common word over the fancy one:
+
+  | Avoid | Use |
+  |---|---|
+  | utilize, leverage | use |
+  | facilitate | help, make easier |
+  | subsequently | then, after that |
+  | commence, initiate | start |
+  | terminate (outside a technical meaning) | end, stop |
+  | ascertain | find out, check |
+  | prior to | before |
+  | in order to | to |
+  | consequently, thus | so |
+  | ubiquitous | everywhere, very common |
+  | mitigate | reduce, lower |
+  | paramount, crucial | very important |
+  | elucidate | explain |
+  | arbitrary | any |
+  | nuanced, subtle | small but important |
+
+  If a word is technical in this topic (for example `terminate` a process, `commit` a
+  transaction, `arbitrary` code execution), keep it.
+- **Short, clear sentences.** One idea per sentence. Prefer active voice ("the kernel saves
+  the registers", not "the registers are saved by the kernel").
+- **No idioms or slang** ("rule of thumb", "under the hood", "a can of worms", "boils down to").
+  Say the plain meaning instead. Keep analogies concrete and from everyday life.
+- **Simple doesn't mean shallow.** Keep the full depth and precision; only the wording around
+  the technical content gets simpler.
 
 ## Git
 
