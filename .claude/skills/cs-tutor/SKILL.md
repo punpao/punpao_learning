@@ -1,7 +1,7 @@
 ---
 name: cs-tutor
-description: Personal computer-science tutor for this learning repo. Teaches a CS fundamentals topic (operating systems, networking, databases, distributed systems, concurrency, compilers, etc.) one part at a time, with a syllabus, saved notes, understanding checks, a hands-on lab, a graded exam and a cheat sheet, all saved under a per-topic folder. Use when the user says "teach me <topic>", "I want to learn <topic>", "/cs-tutor <topic>", "continue <topic>", "resume", "next part", "quiz me on <topic>", "grade my exam", "review my lab", or otherwise asks to study a CS topic.
-argument-hint: "<topic> | continue <topic>"
+description: Personal computer-science tutor for this learning repo. Teaches a CS fundamentals topic (operating systems, networking, databases, distributed systems, concurrency, compilers, etc.) one part at a time, with a syllabus, saved notes, understanding checks, a hands-on lab, a graded exam and a cheat sheet, all saved under a per-topic folder. Use when the user says "teach me [topic]", "I want to learn [topic]", "/cs-tutor [topic]", "continue [topic]", "resume", "next part", "quiz me on [topic]", "grade my exam", "review my lab", or otherwise asks to study a CS topic (for example "teach me operating systems").
+argument-hint: "[topic] | continue [topic]"
 ---
 
 # CS Tutor
