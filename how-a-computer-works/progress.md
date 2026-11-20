@@ -9,7 +9,7 @@
 
 ## Status
 - **Phase:** 2-teaching
-- **Current part:** 01: Bits, bytes, hex and integers
+- **Current part:** 02: Floating point and text encoding
 - **Current step:** menu
 - **Last updated:** 2026-11-20
 
@@ -17,7 +17,7 @@
 | # | Part | Status | Check | Quiz | Notes |
 |---|---|---|---|---|---|
 | 01 | Bits, bytes, hex and integers | ✅ Done | 1.5/2 | 1/4 | [notes](notes/01-bits-bytes-integers.md) |
-| 02 | Floating point and text encoding | ⬜ Not started | — | — | — |
+| 02 | Floating point and text encoding | ✅ Done | 1/2 | — | [notes](notes/02-floats-and-text.md) |
 | 03 | The CPU: instructions, registers and the fetch–decode–execute loop | ⬜ Not started | — | — | — |
 | 04 | The memory hierarchy and caching | ⬜ Not started | — | — | — |
 | 05 | How code runs: compilers, interpreters and VMs | ⬜ Not started | — | — | — |
@@ -35,6 +35,9 @@
 | Size of int32 range: checking whether a result fits | Believed int32 can hold 50,000 × 99,000 (4.95 billion > 2.1 billion max) | Part 1 quiz Q3 | 🔴 Open |
 | Expression type vs assigned type (Java `int + int` overflows before widening to `long`) | Predicted `long total = a + b` prints 4,000,000,000 | Part 1 quiz Q2 | 🔴 Open |
 | Overflow can wrap to a positive value | Did not expect a wrapped product to stay positive | Part 1 quiz Q3 | 🔴 Open |
+| UTF-8 byte structure (lead vs continuation bytes); bytes vs characters | Said `E0 B8 81 41` "contains 2 bytes" (it is 4 bytes, 2 characters); could not tell character boundaries or the Latin-1 reading | Part 2 check Q2 | 🔴 Open |
+| Money column type (DECIMAL / BIGINT minor units) | Did not answer which type for money and why | Part 2 check Q1 | 🔴 Open |
+| Answering every part of a question | Skipped second halves: 0x80 (Part 1 quiz Q1), money type (Part 2 Q1), how-to-tell and Latin-1 (Part 2 Q2) | Parts 1–2 | 🔴 Open |
 | Careful binary arithmetic | Wrote 128 + 1 = 120 (method right, arithmetic slip) | Part 1 check Q1 | 🔴 Open |
 
 ## Quiz log
@@ -51,3 +54,5 @@
 - 2026-11-20: Syllabus approved as drafted. Started Part 1.
 - 2026-11-20: Part 1 done (check 1.5/2). Weak spots: time-unit estimates, integer column types.
 - 2026-11-20: Part 1 quick quiz 1/4. New weak spots: int32 range, expression type vs assigned type, positive wrap.
+- 2026-11-20: Started Part 2.
+- 2026-11-20: Part 2 done (check 1/2). Weak spots: UTF-8 byte structure, money column type, answering every part.

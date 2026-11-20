@@ -10,7 +10,7 @@ My personal repository for learning computer science fundamentals properly, with
 
 | Topic | Status | Progress | Exam score | Started | Completed |
 |---|---|---|---|---|---|
-| [How a Computer Works](how-a-computer-works/) | 📖 Learning | Part 1/8 | — | 2026-11-20 | — |
+| [How a Computer Works](how-a-computer-works/) | 📖 Learning | Part 2/8 | — | 2026-11-20 | — |
 
 **Status legend:** 📝 Syllabus · 📖 Learning · 🧪 Lab · 🎯 Exam · ✅ Done
 
