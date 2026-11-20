@@ -200,6 +200,49 @@ faster." Why might it not help, what must change, and why never 64×?
   input, combine results, dependent steps) sets the limit (Amdahl's law); (2) splitting has a cost
   (start processes, copy data, collect results); (3) cores share memory bandwidth, cache and disk.
 
+## Quick quiz on Parts 1–3 (2026-11-20): Q1 ½, Q2–Q5 skipped
+
+**Q1.** How does overflow differ in C, Java, NumPy and Postgres? Why is it more dangerous in
+C/Java/NumPy? Why can a wrapped result be positive, and why does that hide the bug?
+- **My answer:** C and Java wrap if signed; NumPy/pandas (written in C) wrap; Postgres raises an
+  error. It's dangerous because there's no error and it works wrongly in silence.
+- **Feedback:** ½. ✅ Java wraps; NumPy/pandas fixed-width wrap silently; Postgres errors; silent
+  wrong values flow into joins/totals/reports. ❌ C **signed** overflow is **undefined
+  behaviour** (the compiler may assume it never happens and remove overflow checks such as
+  `if (x + 1 < x)`); C **unsigned** wraps. ❌ Missing: only the **low 32 bits** are kept; if
+  the top bit of what's left is 0, it reads as **positive**, so "negative = bug" checks pass and the
+  wrong number looks normal (odometer at 500,000 after 1,500,000 km).
+
+**Model answers for the skipped questions**
+
+**Q2.** Java `long totalBytes = fileCount * avgFileSize;` (both `int`) is sometimes negative.
+- Both operands are `int`, so the multiplication runs in 32-bit arithmetic and wraps **before**
+  the result is widened to `long`. The assigned type doesn't change how the right side is
+  calculated. Fix: `(long) fileCount * avgFileSize`, or use `Math.multiplyExact` to throw on overflow.
+
+**Q3.** Unicode vs UTF-8; character boundaries; Latin-1 and Thai.
+- Unicode is the catalogue (character → code point, e.g. ก = `U+0E01`); UTF-8 is an encoding
+  (code point → 1–4 bytes). In UTF-8, a byte starting `0` is a 1-byte ASCII character; a lead
+  byte's number of leading 1s (`110`, `1110`, `11110`) gives the character's byte count; every
+  continuation byte starts with `10`. Latin-1 treats every byte as one character, so each 3-byte
+  Thai character shows as 3 wrong Latin characters (mojibake). The bytes are fine; only the
+  reading is wrong (unless the tool saves again → double encoding).
+
+**Q4.** The revenue total is off by a few satang and changes each Spark rerun.
+- Off by satang: `DOUBLE` can't store most decimal amounts exactly (0.1 is a repeating binary
+  fraction), so rounding errors build up over many additions. Changes per run: Spark combines
+  partition sums in a different order each time, and float addition is not associative. Fix:
+  store and sum money as `DECIMAL(p, s)` or `BIGINT` satang. These are exact, so you get the same total in any order,
+  and it matches finance.
+
+**Q5.** A `while` loop at the machine level; what ends it; why extra cores don't help a dependent loop.
+- The body's instructions run; at the end (or start) a `CMP` sets flags, and a conditional jump
+  writes the loop's start address back into the PC while the condition holds, so the same
+  instructions are fetched again. When the condition fails, the jump is not taken: the PC just
+  moves on to the instruction after the loop, and the loop ends. If each iteration needs the
+  previous result, the iterations form one chain that must run in order on one core. Other cores
+  have nothing they can start early (this is the serial part in Amdahl's law).
+
 ## References
 - CS:APP ch. 3 (machine-level representation), ch. 4.1 (ISA), ch. 1.9 (Amdahl's law, concurrency)
 - Patterson & Hennessy, *Computer Organization and Design*, ch. 1 and 4
