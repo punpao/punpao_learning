@@ -204,6 +204,38 @@ od -An -tx1 hi.txt       # works on both:  48 69 21 0a
     still use up sequence values. Alert before the limit. Postgres fails loudly at the limit
     (`reached maximum value of sequence` / `integer out of range`). It does not wrap.
 
+## Quick quiz (2026-11-20): 1/4
+
+**Q1.** (a) `0x7F` and `0x80` as `int8`; (b) −20 as `int8` in binary and hex.
+- **My answer:** (a) 127 (0x80 not answered); (b) `1110 1100` = `0xEC`.
+- **Feedback:** ¾. (a) `0x80` = `1000 0000` = **−128**. (b) correct.
+
+**Q2.** Java: `int a = 2_000_000_000; int b = 2_000_000_000; long total = a + b;`. What prints?
+- **My answer:** 4,000,000,000 (because `long` is 64 bits).
+- **Feedback:** ❌. It prints **−294,967,296**. `a + b` is calculated in 32-bit `int` arithmetic
+  first and wraps (4,000,000,000 − 2³²). Only then is it widened to `long`. The type you assign
+  to does not change how the right-hand side is calculated. Fix: `(long) a + b`, or use
+  `Math.addExact` to throw on overflow.
+
+**Q3.** pandas `int32` columns: 50,000 × 99,000 gives 655,032,704. Correct value, why, fix?
+- **My answer:** no idea; thought int32 can still hold 50,000 × 99,000.
+- **Feedback:** ❌. Correct = **4,950,000,000**. `int32` = 32 **bits** (max ≈ 2.1 billion, 10 digits), not 32 digits.
+  The inputs fit, but the product doesn't. Only the low 32 bits are kept:
+  4,950,000,000 − 2³² = 655,032,704. That is below 2³¹, so it reads as **positive**. Wrapped values are not always
+  negative, which makes them hard to spot. Fix: `.astype("int64")` before multiplying; store money as `int64`;
+  add sanity checks.
+- **Another angle (odometer):** a 6-digit car odometer shows 500,000 after 1,500,000 km. The number is positive and looks normal, but it's wrong.
+  ```bash
+  python3 -c 'print((50_000 * 99_000) % 2**32)'   # 655032704: keep only the low 32 bits
+  ```
+
+**Q4.** Unix time in **milliseconds** in a signed 32-bit int. How long until overflow?
+- **My answer:** 2³¹ − 1 milliseconds (not converted).
+- **Feedback:** ¼. Finish with a number and a unit:
+  2³¹ ms ≈ 2.15 × 10⁹ ms ÷ 1,000 ≈ 2.15 × 10⁶ s ÷ 86,400 ≈ **24.9 days** (late January 1970).
+  Millisecond timestamps need `int64`; today's is about 1.8 × 10¹².
+  That's why Java's `currentTimeMillis()` returns `long`.
+
 ## References
 - *Computer Systems: A Programmer's Perspective* (CS:APP), ch. 2.1–2.3
 - `man xxd`, `man od`
