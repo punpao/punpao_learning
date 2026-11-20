@@ -194,6 +194,48 @@ od -An -tx1 th.txt     # e0 b9 84 e0 b8 97 e0 b8 a2 20 68 65 6c 6c 6f 0a
   41  01000001  1-byte character (ASCII)
   ```
 
+## Another angle
+### Decimal vs float: when to use each (summary, asked 2026-11-20)
+
+**One question decides it:** will someone count, compare or reconcile this value down to the
+last digit? **Yes** → exact type (`DECIMAL(p, s)` or `BIGINT` minor units). **No, it's a
+measurement or a statistic that already has some error** → float (`DOUBLE` / `float64`).
+
+| Use an exact type (DECIMAL / BIGINT minor units) | Use a float (DOUBLE / float64) |
+|---|---|
+| Prices, order totals, invoice lines | Sensor readings (temperature, PM2.5) |
+| Account balances, payments, refunds | GPS coordinates, distances |
+| Tax and fee amounts (fixed rounding rule) | ML features, model weights, probabilities |
+| Exchange rates used to move money, e.g. `DECIMAL(18,8)` | Averages, std dev, percentiles of metrics |
+| Values that must match another system (finance, reconciliation) | Dashboard ratios (conversion rate, CTR) |
+| Counts of items → plain integers | Latency, CPU %, scientific values |
+
+| | Float (`DOUBLE`) | Decimal (`DECIMAL(p,s)`) | Integer minor units (`BIGINT` satang) |
+|---|---|---|---|
+| Exact for `+ − ×`? | ❌ rounds in binary | ✅ exact in base 10 | ✅ exact |
+| Same sum in any order (Spark)? | ❌ | ✅ | ✅ |
+| Speed | ✅ fastest (CPU float hardware) | slower (mostly software) | ✅ fast |
+| Range | huge (10⁻³⁰⁸ … 10³⁰⁸) | limited by `p` (Spark / BigQuery `NUMERIC` max 38 digits) | about ±9.2 × 10¹⁸ units |
+| Division (`÷ 3`) | rounds | still needs rounding (1/3 isn't exact in base 10) | you choose the rounding |
+| Main risk | errors that add up | slower; overflow if `p` too small | must know each currency's scale (THB 2, JPY 0) |
+
+- Decimals are exact for `+ − ×`, not `÷`. Splitting 100 baht three ways needs a rule (33.34 + 33.33 + 33.33).
+- `DECIMAL(p, s)`: `p` = total digits, `s` = digits after the point. `DECIMAL(18,2)` max = 9,999,999,999,999,999.99.
+
+| Tool | Exact | Float |
+|---|---|---|
+| SQL (Postgres, MySQL) | `NUMERIC` / `DECIMAL(p,s)` | `REAL` (32-bit), `DOUBLE PRECISION` (64-bit) |
+| BigQuery | `NUMERIC`, `BIGNUMERIC` | `FLOAT64` |
+| Spark / Parquet | `DecimalType(p,s)` / `DECIMAL` | `DoubleType` / `DOUBLE` |
+| Python | `decimal.Decimal("0.1")` (from a string) | `float` |
+| Java | `BigDecimal` (from a string) | `double` |
+| pandas | no fast built-in decimal column; money often kept as `int64` satang | `float64` |
+| JSON | money as a string (`"129.00"`) or integer satang | numbers usually read as float64 |
+
+**If you choose wrong:** float for money → reports off by 0.01, Spark totals change between
+runs, reconciliation fails. Decimal for measurements/ML → slower, libraries want floats anyway,
+and nothing is gained.
+
 ## References
 - CS:APP ch. 2.4 (floating point)
 - David Goldberg, "What Every Computer Scientist Should Know About Floating-Point Arithmetic"
