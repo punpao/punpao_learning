@@ -158,6 +158,112 @@ Parquet than CSV? What kind of query fits row-by-row storage better, and why?
   column chunks, and Parquet files are written once in big batches. Row stores for apps, columnar
   for analytics.
 
+## Another angle
+### Parquet, explained by opening the file (asked 2026-11-21)
+
+**Layout:** a hybrid. Rows are cut into **row groups**; inside each row group every column is
+stored separately as a **column chunk** made of **pages**. A **footer** at the end holds the
+schema (names + types) and, for each row group × column, the byte offset, size, min, max and
+null count.
+```text
+sales.parquet
+┌───────────────────────────────────────────────────────────────┐
+│ "PAR1"                                                        │
+│ ┌── Row group 0 (rows 0 – 249,999) ──────────────────────────┐ │
+│ │  column chunk: col0   [page][page]...                      │ │
+│ │  ...                                                       │ │
+│ │  column chunk: price  [page][page]...        ◀─ read       │ │
+│ └────────────────────────────────────────────────────────────┘ │
+│ ... row groups 1, 2, 3 ...                                     │
+│ FOOTER: schema + per row group × column: offset, size,         │
+│         min, max, null count                 ◀─ read first     │
+│ footer length + "PAR1"                                         │
+└───────────────────────────────────────────────────────────────┘
+```
+
+**`SELECT AVG(price)`:** Parquet → read the footer → read only the `price` byte ranges (on
+S3/GCS: HTTP range requests) → binary doubles, no parsing. CSV → no index, so read the whole file,
+split every line, and parse text to numbers.
+
+**Tricks:** column pruning; **dictionary encoding** (`country` with 4 values → 2-bit codes);
+**RLE** (run-length: "TH × 4"); compression (Snappy/Zstd) on similar neighbouring values; **min/max
+statistics** let a `WHERE` skip whole row groups (**predicate pushdown**). Skipping only works
+when data is sorted/clustered by the filter column (e.g. by date).
+
+**Experiment (1M rows × 50 columns, pyarrow 26):**
+```text
+CSV size:      196.3 MB
+Parquet size:   63.9 MB
+CSV     AVG(price) = 500.62  in 0.91 s
+Parquet AVG(price) = 500.62  in 0.03 s
+bytes Parquet must read for price: 3.8 MB of 63.9 MB
+row group 0, price   : 0.96 MB
+row group 0, country : 0.06 MB       (250,000 strings ≈ 2 bits each)
+min/max of order_day per row group:
+  row group 0: min=  1  max= 92
+  row group 1: min= 92  max=183
+  row group 2: min=183  max=274
+  row group 3: min=274  max=365      (WHERE order_day >= 300 reads only this one)
+```
+`pd.read_csv(usecols=[...])` still scans the whole file; it drops the columns after reading.
+
+| | CSV | Parquet |
+|---|---|---|
+| Layout | rows, as text | row groups → column chunks → pages, binary |
+| Read one column | whole file | only that column's chunks |
+| Types | none; guessed (`"00123"` → `123`) | stored in the schema |
+| Size | large | usually several times smaller |
+| Skipping with `WHERE` | no | yes (min/max) |
+| Human-readable | yes | no |
+| Append/update one row | easy | no: write-once files (Delta Lake/Iceberg manage changes) |
+| Best for | small exchanges, people | analytics scans |
+
+Weak spots: single-row lookups/updates; **tiny files** (each has its own footer and read requests).
+Spark usually aims for row groups of about 128 MB.
+
+Script (`pip install pandas pyarrow`), save as `parquet_vs_csv.py`:
+```python
+import os, time
+import numpy as np
+import pandas as pd
+import pyarrow.parquet as pq
+
+rows, cols = 1_000_000, 50
+rng = np.random.default_rng(0)
+df = pd.DataFrame({f"col{i}": rng.integers(0, 1000, rows) for i in range(cols - 3)})
+df["order_day"] = np.sort(rng.integers(1, 366, rows))         # rows arrive in date order
+df["country"] = rng.choice(["TH", "JP", "SG", "VN"], rows)   # only 4 distinct values
+df["price"] = rng.integers(100, 100_000, rows) / 100          # e.g. 129.50
+
+df.to_csv("sales.csv", index=False)
+df.to_parquet("sales.parquet", row_group_size=250_000)        # 4 row groups
+
+print(f"CSV size:     {os.path.getsize('sales.csv') / 1e6:6.1f} MB")
+print(f"Parquet size: {os.path.getsize('sales.parquet') / 1e6:6.1f} MB")
+
+t = time.time(); avg = pd.read_csv("sales.csv", usecols=["price"])["price"].mean()
+print(f"CSV     AVG(price) = {avg:.2f}  in {time.time() - t:.2f} s")
+t = time.time(); avg = pd.read_parquet("sales.parquet", columns=["price"])["price"].mean()
+print(f"Parquet AVG(price) = {avg:.2f}  in {time.time() - t:.2f} s")
+
+meta = pq.ParquetFile("sales.parquet").metadata
+names = [meta.schema.column(i).name for i in range(meta.num_columns)]
+def chunk(rg, name):
+    return meta.row_group(rg).column(names.index(name))
+
+price_bytes = sum(chunk(r, "price").total_compressed_size for r in range(meta.num_row_groups))
+print(f"\nrow groups: {meta.num_row_groups}, columns: {meta.num_columns}")
+print(f"bytes Parquet must read for price: {price_bytes / 1e6:.1f} MB "
+      f"of {os.path.getsize('sales.parquet') / 1e6:.1f} MB")
+for name in ["price", "country"]:
+    c = chunk(0, name)
+    print(f"row group 0, {name:8s}: {c.total_compressed_size / 1e6:.2f} MB  encodings={c.encodings}")
+print("\nmin/max of order_day per row group (stored in the footer):")
+for r in range(meta.num_row_groups):
+    s = chunk(r, "order_day").statistics
+    print(f"  row group {r}: min={s.min:3d}  max={s.max:3d}")
+```
+
 ## Follow-up questions
 
 ### Q: Does one address store at most 1 byte? How many addresses do memory and disk have, and how do they store data and behave?
