@@ -1,0 +1,88 @@
+# pre-commit for data-engineering-lab. Every tool is pinned in pyproject.toml / uv.lock and runs
+# through `uv run`, so hooks, CI and your shell all use the exact same versions.
+#   make hooks   → install the git hook        make lint → run all hooks on every file
+# pre-commit runs from the repository root, hence the data-engineering-lab/ paths below.
+files: ^data-engineering-lab/
+exclude: ^data-engineering-lab/(uv\.lock|dbt/target/|dbt/dbt_packages/)
+
+repos:
+  - repo: local
+    hooks:
+      # ── safety ──
+      - id: forbid-secret-files
+        name: never commit .env, dbt/profiles.yml or files in secrets/
+        language: fail
+        entry: "secret file staged: keep it local (it is git-ignored for a reason)"
+        files: (^|/)\.env$|dbt/profiles\.yml$|/secrets/(?!README\.md$)
+      - id: detect-private-key
+        name: detect private keys
+        entry: uv run --project data-engineering-lab detect-private-key
+        language: system
+        types: [text]
+      - id: check-added-large-files
+        name: no files over 1 MB
+        entry: uv run --project data-engineering-lab check-added-large-files --maxkb=1024
+        language: system
+      - id: check-merge-conflict
+        name: no merge-conflict markers
+        entry: uv run --project data-engineering-lab check-merge-conflict
+        language: system
+        types: [text]
+
+      # ── hygiene ──
+      - id: trailing-whitespace
+        name: trim trailing whitespace
+        entry: uv run --project data-engineering-lab trailing-whitespace-fixer
+        language: system
+        types: [text]
+      - id: end-of-file-fixer
+        name: files end with one newline
+        entry: uv run --project data-engineering-lab end-of-file-fixer
+        language: system
+        types: [text]
+      - id: check-executables-have-shebangs
+        name: executables have shebangs
+        entry: uv run --project data-engineering-lab check-executables-have-shebangs
+        language: system
+        types: [text, executable]
+
+      # ── config files ──
+      - id: check-json
+        name: valid JSON
+        entry: uv run --project data-engineering-lab check-json
+        language: system
+        types: [json]
+      - id: check-toml
+        name: valid TOML
+        entry: uv run --project data-engineering-lab check-toml
+        language: system
+        types: [toml]
+      - id: yamllint
+        name: yamllint
+        entry: uv run --project data-engineering-lab yamllint -c data-engineering-lab/.yamllint.yaml --strict
+        language: system
+        types: [yaml]
+      - id: shellcheck
+        name: shellcheck
+        entry: uv run --project data-engineering-lab shellcheck -x --source-path=SCRIPTDIR
+        language: system
+        types: [shell]
+
+      # ── Python ──
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --project data-engineering-lab ruff check --fix --config data-engineering-lab/pyproject.toml
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --project data-engineering-lab ruff format --config data-engineering-lab/pyproject.toml
+        language: system
+        types_or: [python, pyi]
+
+      # ── SQL (dbt models) ──
+      - id: sqlfluff-lint
+        name: sqlfluff lint
+        entry: uv run --project data-engineering-lab sqlfluff lint --config data-engineering-lab/.sqlfluff
+        language: system
+        types: [sql]

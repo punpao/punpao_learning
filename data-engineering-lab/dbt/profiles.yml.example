@@ -1,0 +1,62 @@
+# Copy to dbt/profiles.yml (make init does this). profiles.yml is git-ignored.
+# Every credential is read from environment variables (.env) — never type secrets here.
+#
+# Targets:
+#   dev        DuckDB file on your laptop (default; no services needed)
+#   lakehouse  DuckDB + Iceberg tables in Lakekeeper/MinIO (needs `make up`)
+#   snowflake  optional cloud warehouse, key-pair auth (RUNBOOK §3.3)
+#
+# Run locally:    make dbt ARGS="debug --target dev"
+# In Airflow:     $DBT_VENV/bin/dbt build --project-dir $DBT_PROJECT_DIR --target dev
+# Container-side values (paths, hostnames) are overridden by docker-compose.yml.
+
+de_lab:
+  target: dev
+  outputs:
+
+    dev:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', '../data/lab.duckdb') }}"
+      threads: 4
+
+    lakehouse:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', '../data/lab.duckdb') }}"
+      threads: 4
+      extensions:
+        - httpfs
+        - iceberg
+      secrets:
+        # S3 credentials for MinIO (the least-privilege lab user, not root)
+        - type: s3
+          name: lakehouse_s3
+          key_id: "{{ env_var('LAKEHOUSE_S3_ACCESS_KEY') }}"
+          secret: "{{ env_var('LAKEHOUSE_S3_SECRET_KEY') }}"
+          region: "{{ env_var('S3_REGION', 'us-east-1') }}"
+          endpoint: "{{ env_var('S3_ENDPOINT', 'localhost:9000') }}"
+          url_style: path
+          use_ssl: "false"
+      attach:
+        # Iceberg warehouse served by Lakekeeper → tables appear as lakehouse.<namespace>.<table>
+        - path: "{{ env_var('LAKEKEEPER_WAREHOUSE', 'lakehouse') }}"
+          alias: lakehouse
+          type: iceberg
+          options:
+            endpoint: "{{ env_var('LAKEKEEPER_CATALOG_URL', 'http://localhost:8181/catalog') }}"
+            authorization_type: none           # local lab: catalog has no auth
+            access_delegation_mode: none       # use the S3 secret above, not vended credentials
+
+    snowflake:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
+      authenticator: snowflake_jwt
+      private_key_path: "{{ env_var('SECRETS_DIR', '../secrets') }}/{{ env_var('SNOWFLAKE_PRIVATE_KEY_FILE', 'snowflake_rsa_key.p8') }}"
+      private_key_passphrase: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PASSPHRASE') }}"
+      threads: 4
+      client_session_keep_alive: false
+      query_tag: de_lab

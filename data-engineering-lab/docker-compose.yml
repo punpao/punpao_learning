@@ -1,0 +1,444 @@
+# data-engineering-lab — local modern data platform
+#
+#   make up                  → profile "core"           (source Postgres, platform DB, MinIO, Lakekeeper)
+#   make up-streaming        → core + "streaming"       (Kafka KRaft, Kafka Connect/Debezium, Kafka UI)
+#   make up-orchestration    → core + "orchestration"   (Airflow 3)
+#   make up-all              → everything
+#
+# All values come from .env (copy .env.example). Host ports bind to 127.0.0.1 only,
+# so nothing here is reachable from your network. See RUNBOOK.md.
+
+name: de-lab
+
+x-airflow-common: &airflow-common
+  build:
+    context: ./docker/airflow
+  image: de-lab/airflow:3.4.0
+  profiles: [orchestration]
+  user: "${AIRFLOW_UID:-50000}:0"
+  restart: unless-stopped
+  environment: &airflow-env
+    # --- core settings ---
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD:?set AIRFLOW_DB_PASSWORD in .env}@platform-db:5432/airflow
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:?set AIRFLOW_FERNET_KEY in .env}
+    AIRFLOW__API__SECRET_KEY: ${AIRFLOW_API_SECRET_KEY:?set AIRFLOW_API_SECRET_KEY in .env}
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:?set AIRFLOW_JWT_SECRET in .env}
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: "30"   # pick up new DAG files within 30s
+    # --- keep it small for a 16 GB laptop ---
+    AIRFLOW__CORE__PARALLELISM: "8"
+    AIRFLOW__API__WORKERS: "1"
+    # --- pre-wired connections (used by future lab DAGs) ---
+    AIRFLOW_CONN_SOURCE_POSTGRES: postgresql://${SOURCE_PG_USER}:${SOURCE_PG_PASSWORD}@postgres-source:5432/${SOURCE_PG_DB:-labdb}
+    AIRFLOW_CONN_LAKEHOUSE_S3: >-
+      {"conn_type": "aws", "login": "${LAKEHOUSE_S3_ACCESS_KEY}", "password": "${LAKEHOUSE_S3_SECRET_KEY}",
+      "extra": {"endpoint_url": "http://minio:9000", "region_name": "${S3_REGION:-us-east-1}"}}
+    # --- dbt / DuckDB / Iceberg (container-side values) ---
+    DBT_VENV: /opt/dbt-venv
+    DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+    DBT_VERSION_CHECK: "false"
+    DBT_PROJECT_DIR: /opt/airflow/dbt
+    DBT_PROFILES_DIR: /opt/airflow/dbt
+    DBT_TARGET_PATH: /tmp/dbt/target
+    DBT_LOG_PATH: /tmp/dbt/logs
+    DUCKDB_PATH: /opt/airflow/data/lab.duckdb
+    S3_ENDPOINT: minio:9000
+    S3_REGION: ${S3_REGION:-us-east-1}
+    LAKEHOUSE_BUCKET: ${LAKEHOUSE_BUCKET:-lakehouse}
+    RAW_BUCKET: ${RAW_BUCKET:-raw}
+    LAKEHOUSE_S3_ACCESS_KEY: ${LAKEHOUSE_S3_ACCESS_KEY}
+    LAKEHOUSE_S3_SECRET_KEY: ${LAKEHOUSE_S3_SECRET_KEY}
+    LAKEKEEPER_CATALOG_URL: http://lakekeeper:8181/catalog
+    LAKEKEEPER_WAREHOUSE: ${LAKEKEEPER_WAREHOUSE:-lakehouse}
+    SECRETS_DIR: /opt/airflow/secrets
+    SNOWFLAKE_ACCOUNT: ${SNOWFLAKE_ACCOUNT:-}
+    SNOWFLAKE_USER: ${SNOWFLAKE_USER:-}
+    SNOWFLAKE_ROLE: ${SNOWFLAKE_ROLE:-}
+    SNOWFLAKE_WAREHOUSE: ${SNOWFLAKE_WAREHOUSE:-}
+    SNOWFLAKE_DATABASE: ${SNOWFLAKE_DATABASE:-}
+    SNOWFLAKE_SCHEMA: ${SNOWFLAKE_SCHEMA:-}
+    SNOWFLAKE_PRIVATE_KEY_FILE: ${SNOWFLAKE_PRIVATE_KEY_FILE:-snowflake_rsa_key.p8}
+    SNOWFLAKE_PRIVATE_KEY_PASSPHRASE: ${SNOWFLAKE_PRIVATE_KEY_PASSPHRASE:-}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./plugins:/opt/airflow/plugins
+    - ./dbt:/opt/airflow/dbt
+    - ./data:/opt/airflow/data
+    - ./secrets:/opt/airflow/secrets:ro
+    - airflow-logs:/opt/airflow/logs
+  deploy:
+    resources:
+      limits:
+        memory: 1g
+  depends_on: &airflow-depends-on
+    platform-db:
+      condition: service_healthy
+    airflow-init:
+      condition: service_completed_successfully
+
+services:
+  # ───────────────────────────────── core ─────────────────────────────────
+
+  postgres-source:
+    image: postgres:18.7
+    profiles: [core]
+    restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - wal_level=logical            # required for CDC (Debezium / pgoutput)
+      - -c
+      - max_replication_slots=10
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_slot_wal_keep_size=2GB   # an abandoned slot can never fill your disk
+    environment:
+      POSTGRES_DB: ${SOURCE_PG_DB:-labdb}
+      POSTGRES_USER: ${SOURCE_PG_USER:?set SOURCE_PG_USER in .env}
+      POSTGRES_PASSWORD: ${SOURCE_PG_PASSWORD:?set SOURCE_PG_PASSWORD in .env}
+      SOURCE_PG_CDC_USER: ${SOURCE_PG_CDC_USER:?set SOURCE_PG_CDC_USER in .env}
+      SOURCE_PG_CDC_PASSWORD: ${SOURCE_PG_CDC_PASSWORD:?set SOURCE_PG_CDC_PASSWORD in .env}
+      DEBEZIUM_PUBLICATION: ${DEBEZIUM_PUBLICATION:-dbz_publication}
+    ports:
+      - "127.0.0.1:${SOURCE_PG_HOST_PORT:-5433}:5432"
+    volumes:
+      - source-pg-data:/var/lib/postgresql
+      - ./docker/postgres-source/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  platform-db:
+    image: postgres:18.7-alpine
+    profiles: [core]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${PLATFORM_DB_SUPERUSER:?set PLATFORM_DB_SUPERUSER in .env}
+      POSTGRES_PASSWORD: ${PLATFORM_DB_SUPERUSER_PASSWORD:?set PLATFORM_DB_SUPERUSER_PASSWORD in .env}
+      AIRFLOW_DB_PASSWORD: ${AIRFLOW_DB_PASSWORD:?set AIRFLOW_DB_PASSWORD in .env}
+      LAKEKEEPER_DB_PASSWORD: ${LAKEKEEPER_DB_PASSWORD:?set LAKEKEEPER_DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${PLATFORM_DB_HOST_PORT:-5434}:5432"
+    volumes:
+      - platform-db-data:/var/lib/postgresql
+      - ./docker/platform-db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  minio:
+    image: ${MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z}
+    profiles: [core]
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${MINIO_API_HOST_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  # one-shot: buckets + a least-privilege S3 user for the lakehouse
+  minio-init:
+    image: ${MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z}
+    profiles: [core]
+    restart: "no"
+    entrypoint: ["/bin/sh", "/init/init.sh"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      LAKEHOUSE_S3_ACCESS_KEY: ${LAKEHOUSE_S3_ACCESS_KEY:?set LAKEHOUSE_S3_ACCESS_KEY in .env}
+      LAKEHOUSE_S3_SECRET_KEY: ${LAKEHOUSE_S3_SECRET_KEY:?set LAKEHOUSE_S3_SECRET_KEY in .env}
+      LAKEHOUSE_BUCKET: ${LAKEHOUSE_BUCKET:-lakehouse}
+      RAW_BUCKET: ${RAW_BUCKET:-raw}
+    volumes:
+      - ./docker/object-store:/init:ro
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  lakekeeper-migrate:
+    image: vakamo/lakekeeper:v0.13.9
+    profiles: [core]
+    restart: "no"
+    command: ["migrate"]
+    environment: &lakekeeper-env
+      LAKEKEEPER__PG_DATABASE_URL_READ: postgresql://lakekeeper:${LAKEKEEPER_DB_PASSWORD}@platform-db:5432/lakekeeper
+      LAKEKEEPER__PG_DATABASE_URL_WRITE: postgresql://lakekeeper:${LAKEKEEPER_DB_PASSWORD}@platform-db:5432/lakekeeper
+      LAKEKEEPER__PG_ENCRYPTION_KEY: ${LAKEKEEPER_ENCRYPTION_KEY:?set LAKEKEEPER_ENCRYPTION_KEY in .env}
+      LAKEKEEPER__AUTHZ_BACKEND: allowall   # local lab only: no auth on the catalog
+      RUST_LOG: info
+    depends_on:
+      platform-db:
+        condition: service_healthy
+
+  lakekeeper:
+    image: vakamo/lakekeeper:v0.13.9
+    profiles: [core]
+    restart: unless-stopped
+    command: ["serve"]
+    environment: *lakekeeper-env
+    ports:
+      - "127.0.0.1:${LAKEKEEPER_HOST_PORT:-8181}:8181"
+    healthcheck:
+      test: ["CMD", "/home/nonroot/lakekeeper", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    depends_on:
+      lakekeeper-migrate:
+        condition: service_completed_successfully
+
+  # one-shot: bootstrap Lakekeeper and register the Iceberg warehouse on MinIO
+  lakekeeper-init:
+    image: curlimages/curl:8.23.0
+    profiles: [core]
+    restart: "no"
+    entrypoint: ["/bin/sh", "/init/init.sh"]
+    environment:
+      LAKEKEEPER_URL: http://lakekeeper:8181
+      LAKEKEEPER_WAREHOUSE: ${LAKEKEEPER_WAREHOUSE:-lakehouse}
+      LAKEHOUSE_BUCKET: ${LAKEHOUSE_BUCKET:-lakehouse}
+      LAKEHOUSE_S3_ACCESS_KEY: ${LAKEHOUSE_S3_ACCESS_KEY}
+      LAKEHOUSE_S3_SECRET_KEY: ${LAKEHOUSE_S3_SECRET_KEY}
+      S3_REGION: ${S3_REGION:-us-east-1}
+    volumes:
+      - ./docker/lakekeeper:/init:ro
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  # ─────────────────────────────── streaming ───────────────────────────────
+
+  kafka:
+    image: apache/kafka:4.3.2
+    profiles: [streaming]
+    restart: unless-stopped
+    environment:
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID:-4L6g3nShT-eMCtK--X86sw}
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller          # KRaft combined mode, no ZooKeeper
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: INTERNAL://:29092,CONTROLLER://:29093,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:${KAFKA_HOST_PORT:-9092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx768m
+    ports:
+      - "127.0.0.1:${KAFKA_HOST_PORT:-9092}:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 > /dev/null 2>&1"]
+      interval: 15s
+      timeout: 15s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1280m
+
+  kafka-connect:
+    image: ${DEBEZIUM_CONNECT_IMAGE:-quay.io/debezium/connect:3.6.2.Final}
+    profiles: [streaming]
+    restart: unless-stopped
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: de-lab-connect
+      CONFIG_STORAGE_TOPIC: _connect_configs
+      OFFSET_STORAGE_TOPIC: _connect_offsets
+      STATUS_STORAGE_TOPIC: _connect_status
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      HEAP_OPTS: -Xms256m -Xmx768m
+      # extra connector plugins (e.g. the Iceberg sink) go in ./docker/kafka-connect/plugins
+      CONNECT_PLUGIN_PATH: /kafka/connect,/kafka/extra-plugins
+      # connector JSON can reference ${env:VAR}; secrets never get stored in Kafka
+      CONNECT_CONFIG_PROVIDERS: env
+      CONNECT_CONFIG_PROVIDERS_ENV_CLASS: org.apache.kafka.common.config.provider.EnvVarConfigProvider
+      # values the connector templates read via ${env:...}
+      SOURCE_PG_DB: ${SOURCE_PG_DB:-labdb}
+      SOURCE_PG_CDC_USER: ${SOURCE_PG_CDC_USER}
+      SOURCE_PG_CDC_PASSWORD: ${SOURCE_PG_CDC_PASSWORD}
+      DEBEZIUM_PUBLICATION: ${DEBEZIUM_PUBLICATION:-dbz_publication}
+      DEBEZIUM_SLOT_NAME: ${DEBEZIUM_SLOT_NAME:-debezium_lab}
+      CDC_TOPIC_PREFIX: ${CDC_TOPIC_PREFIX:-cdc}
+      LAKEHOUSE_S3_ACCESS_KEY: ${LAKEHOUSE_S3_ACCESS_KEY}
+      LAKEHOUSE_S3_SECRET_KEY: ${LAKEHOUSE_S3_SECRET_KEY}
+      LAKEKEEPER_WAREHOUSE: ${LAKEKEEPER_WAREHOUSE:-lakehouse}
+      S3_REGION: ${S3_REGION:-us-east-1}
+    ports:
+      - "127.0.0.1:${KAFKA_CONNECT_HOST_PORT:-8083}:8083"
+    volumes:
+      - ./docker/kafka-connect/plugins:/kafka/extra-plugins:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8083/connector-plugins > /dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 1280m
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  kafka-ui:
+    image: kafbat/kafka-ui:v1.5.1
+    profiles: [streaming]
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: de-lab
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: connect
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect:8083
+      DYNAMIC_CONFIG_ENABLED: "false"
+      AUTH_TYPE: LOGIN_FORM
+      SPRING_SECURITY_USER_NAME: ${KAFKA_UI_USER:?set KAFKA_UI_USER in .env}
+      SPRING_SECURITY_USER_PASSWORD: ${KAFKA_UI_PASSWORD:?set KAFKA_UI_PASSWORD in .env}
+      JAVA_OPTS: -Xmx256m
+    ports:
+      - "127.0.0.1:${KAFKA_UI_HOST_PORT:-8082}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # ───────────────────────────── orchestration ─────────────────────────────
+
+  # one-shot: migrate the Airflow metadata DB and create the admin user
+  airflow-init:
+    <<: *airflow-common
+    restart: "no"
+    command: ["version"]
+    environment:
+      <<: *airflow-env
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USER:?set AIRFLOW_ADMIN_USER in .env}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?set AIRFLOW_ADMIN_PASSWORD in .env}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+
+  airflow-apiserver:
+    <<: *airflow-common
+    command: ["api-server"]
+    ports:
+      - "127.0.0.1:${AIRFLOW_HOST_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/version"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: ["scheduler"]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      <<: *airflow-depends-on
+      airflow-apiserver:
+        condition: service_healthy
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: ["dag-processor"]
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type DagProcessorJob --hostname \"$${HOSTNAME}\""]
+      interval: 30s
+      timeout: 20s
+      retries: 10
+      start_period: 60s
+
+  airflow-triggerer:
+    <<: *airflow-common
+    command: ["triggerer"]
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type TriggererJob --hostname \"$${HOSTNAME}\""]
+      interval: 30s
+      timeout: 20s
+      retries: 10
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+
+volumes:
+  source-pg-data:
+  platform-db-data:
+  minio-data:
+  kafka-data:
+  airflow-logs:

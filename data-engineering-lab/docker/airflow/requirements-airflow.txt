@@ -1,0 +1,4 @@
+# Extra packages installed into Airflow's own Python environment.
+# Keep this short — anything heavy or conflict-prone belongs in a separate venv
+# (see requirements-dbt.txt). Rebuild after editing: make build
+duckdb==1.5.6

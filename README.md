@@ -11,8 +11,10 @@ My personal repository for learning computer science fundamentals properly, with
 | Topic | Status | Progress | Exam score | Started | Completed |
 |---|---|---|---|---|---|
 | [How a Computer Works](how-a-computer-works/) | 📖 Learning | Part 4/8 | — | 2026-11-20 | — |
+| [Data Engineering Lab](data-engineering-lab/) — hands-on platform ([runbook](data-engineering-lab/RUNBOOK.md)) | 🧪 Lab | Platform ready · 0 labs | — | 2026-11-23 | — |
 
 **Status legend:** 📝 Syllabus · 📖 Learning · 🧪 Lab · 🎯 Exam · ✅ Done
 
 Each topic folder contains `syllabus.md`, `progress.md`, `notes/`, `lab/`, `exam/` and,
-once finished, `key-learnings.md`.
+once finished, `key-learnings.md`. The exception is `data-engineering-lab/`, a hands-on lab platform
+with its own README and runbook.

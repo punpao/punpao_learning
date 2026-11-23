@@ -1,0 +1,5 @@
+# Installed into /opt/dbt-venv (isolated from Airflow). Keep in sync with ../../pyproject.toml.
+dbt-core==1.12.7
+dbt-duckdb==1.11.1
+dbt-snowflake==1.12.5
+duckdb==1.5.6

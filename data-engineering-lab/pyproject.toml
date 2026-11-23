@@ -1,0 +1,39 @@
+[project]
+name = "data-engineering-lab"
+version = "0.1.0"
+description = "Local tooling for the data-engineering-lab platform (dbt, DuckDB, Iceberg client, linters)."
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "dbt-core==1.12.7",
+    "dbt-duckdb==1.11.1",
+    "dbt-snowflake==1.12.5",
+    "duckdb==1.5.6",
+    "pyiceberg[pyarrow,s3fs]==0.12.0",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit==4.7.0",
+    "pre-commit-hooks==6.0.0",
+    "ruff==0.17.6",
+    "shellcheck-py==0.11.0.1",
+    "sqlfluff==4.5.0",
+    "yamllint==1.38.0",
+]
+
+[tool.uv]
+package = false
+default-groups = ["dev"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["dbt/target", "dbt/dbt_packages", "data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "S"]
+ignore = ["S101"]  # assert is fine in lab code and tests
+
+[tool.ruff.lint.per-file-ignores]
+"dags/**" = ["S608"]  # templated SQL in DAGs is expected

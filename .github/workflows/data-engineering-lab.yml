@@ -1,0 +1,56 @@
+# CI stub for data-engineering-lab: lint + static validation only (no containers are started).
+# Runs only when files under data-engineering-lab/ (or this workflow) change.
+name: data-engineering-lab
+
+on:
+  push:
+    paths:
+      - "data-engineering-lab/**"
+      - ".github/workflows/data-engineering-lab.yml"
+  pull_request:
+    paths:
+      - "data-engineering-lab/**"
+      - ".github/workflows/data-engineering-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: data-engineering-lab-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.13.9"
+          enable-cache: true
+          cache-dependency-glob: data-engineering-lab/uv.lock
+
+      - name: Install toolchain (locked)
+        working-directory: data-engineering-lab
+        run: uv sync --locked
+
+      - name: pre-commit (ruff, sqlfluff, yamllint, shellcheck, secret checks)
+        run: uv run --project data-engineering-lab pre-commit run --all-files --show-diff-on-failure -c data-engineering-lab/.pre-commit-config.yaml
+
+      - name: docker compose config is valid (with the placeholder .env)
+        working-directory: data-engineering-lab
+        run: |
+          cp .env.example .env
+          docker compose --profile core --profile streaming --profile orchestration config --quiet
+
+      - name: dbt parse (no database connection)
+        working-directory: data-engineering-lab/dbt
+        env:
+          DBT_PROFILES_DIR: .
+          DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+        run: |
+          cp profiles.yml.example profiles.yml
+          uv run dbt parse --target dev

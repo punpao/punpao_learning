@@ -1,0 +1,33 @@
+# dbt project skeleton for data-engineering-lab. No models yet: each lab adds its own.
+name: de_lab
+version: "1.0.0"
+config-version: 2
+profile: de_lab          # matches the top-level key in profiles.yml
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets: ["target", "dbt_packages"]
+
+flags:
+  send_anonymous_usage_stats: false
+
+# Layer conventions (override per model/folder as labs need):
+#   staging      → views, 1:1 with sources, light renaming/casting      (stg_<source>__<entity>)
+#   intermediate → ephemeral/views, joins and business logic             (int_<entity>_<verb>)
+#   marts        → tables, consumer-facing facts and dimensions          (fct_ / dim_)
+models:
+  de_lab:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: ephemeral
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts
