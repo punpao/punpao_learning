@@ -133,7 +133,7 @@ section current.
 
 ## `<slug>/notes/<NN>-<part-slug>.md`
 
-```markdown
+````markdown
 # Part <N>: <Title>
 
 > **Objective:** <from syllabus>
@@ -191,7 +191,7 @@ section current.
 
 ## References
 - <book chapter / man page / RFC / source file>
-```
+````
 
 Leave out the sections that end up empty ("Follow-up questions", "Another angle", "Deeper dive",
 "Quick quiz") rather than leaving empty headings.
@@ -200,7 +200,7 @@ Leave out the sections that end up empty ("Follow-up questions", "Another angle"
 
 ## `<slug>/key-learnings.md`
 
-```markdown
+````markdown
 # <Topic>: Key Learnings
 
 **Completed:** <YYYY-MM-DD> · **Exam:** <score>/100 · **Lab:** <status>
@@ -228,4 +228,4 @@ commands, state machines. Fits on one printed page.>
 ## What to learn next
 - **Next topics:** <e.g. after OS → concurrency, then distributed systems>
 - **Resources:** <books / courses / papers, with the specific chapters that matter>
-```
+````
