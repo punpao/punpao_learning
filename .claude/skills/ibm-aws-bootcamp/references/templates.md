@@ -27,13 +27,13 @@ When it's finished: `✅ Done | Day 7/7 | Exam 81/100, SD mock 76/100 | <start> 
 ## Status
 - **Current day:** <N> (planned date <YYYY-MM-DD>)
 - **Current block:** <e.g. 3.2 Resilience>
-- **Current step:** <teaching | awaiting-prediction | awaiting-check-answers | menu | build | sd-attempt | sd-review | review | done>
-- **Schedule:** <on track | behind by ~N h: cutting X>
+- **Current step:** <teaching | awaiting-prediction | awaiting-check-answers | menu | build-plan | build | explain-back | teach-back | sd-attempt | sd-review | review | done>
+- **Pace:** <on track | carried over: X to Day N+1 | added a day on <date>>
 
 ## Days
-| Day | Theme | Planned | Status | Quiz | SD score | Notes |
-|---|---|---|---|---|---|---|
-| 1 | JS, Node.js, HTTP | 2026-11-24 | ✅ | 8/10 | 58 | [notes](notes/day-1-node-http.md) |
+| Day | Theme | Planned | Status | Quiz | Teach-back | SD score | Notes |
+|---|---|---|---|---|---|---|---|
+| 1 | JS, Node.js, HTTP | 2026-11-24 | ✅ | 8/10 | 7/10 | 58 | [notes](notes/day-1-node-http.md) |
 
 ## Pending check questions
 1. <question>  <!-- empty when nothing is waiting -->
@@ -89,6 +89,11 @@ When it's finished: `✅ Done | Day 7/7 | Exam 81/100, SD mock 76/100 | <start> 
 
 ## System design
 - Concept summary + link to `system-design/day-N-<problem>.md` + score
+
+## Teach it back: <score>/10
+> <the user's 5-sentence explanation>
+
+- Feedback: …
 
 ## Daily quiz: <score>/10
 - Missed: …

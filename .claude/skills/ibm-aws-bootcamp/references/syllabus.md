@@ -4,7 +4,10 @@
 **Pace:** 10–12 hours per day · **Stack:** Node.js + TypeScript, Express, Angular, AWS (CDK)
 **Legend:** 🔴 must-have · 🟡 nice-to-have (cut first if behind) · ⏱ rough time
 
-Every day = Learn blocks → Build block → System design block → Review block.
+Every day = Learn blocks → Build block → System design block → Review block (with a teach-back).
+**Understanding first:** times are guides. A block is finished when you understand it, not
+when the clock says so. Unfinished 🔴 blocks move to the next day, 🟡 items are cut first, and
+if the plan slips by more than half a day you choose: add a day, cut more, or keep the pace.
 One project grows every day (see `project.md`). One system design practice every day
 (see `system-design.md`).
 

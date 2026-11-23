@@ -128,7 +128,9 @@ Structure the lesson as **intuition → mechanics → concrete example**:
 - **Concrete example**: walk through a specific case step by step.
 - **Run it yourself**: 1–3 small code or shell snippets the user can run locally on Linux/macOS
   (e.g. `strace`/`dtruss`, `ps`, `/proc`, `ss`/`netstat`, `dig`, `curl -v`, `tcpdump`, `psql`,
-  short C/Python/Go programs). Say what output to expect and what to notice. When a command
+  short C/Python/Go programs). Say what output to expect and what to notice. Include at least
+  one **"break it"** experiment: change or remove one thing, ask the user to predict the result,
+  then run it and explain. When a command
   differs between Linux and macOS, give both (e.g. `strace` vs `dtruss`, `ss` vs `netstat`,
   `/proc` is Linux-only). Prefer safe, read-only commands. Flag anything that needs `sudo`.
 - **Socratic when it helps**: for a part with a counterintuitive result, split the teaching into
@@ -157,7 +159,10 @@ and **end your turn**.
 When the user answers, give feedback:
 - Say what was right, specifically.
 - Correct what was wrong or imprecise **directly**, with the precise statement and why.
-- If they missed a core idea, re-explain that idea briefly from a different angle.
+- **Understanding gate:** if they missed a core idea, don't show the menu yet. Re-explain it
+  in a *different* way (a new analogy, a diagram, a tiny experiment) and ask a *new* check
+  question. After 2 rounds, log it as a weak spot and move on; come back to it at the start of
+  the next session.
 - Record any weakness in the "Weak spots" table of `progress.md` (concept, evidence, source).
 
 ### Step 5: Save notes
@@ -240,6 +245,26 @@ Read [references/exam-guide.md](references/exam-guide.md) and follow it.
 2. Set `progress.md` to `done`. Update the root `README.md`: status `✅ Done`, exam score,
    completion date.
 3. Offer the final commit.
+
+## Deep understanding and pacing
+
+The user wants to *really* understand, gradually, and not be rushed. Understanding means they
+can **explain, predict and apply** the idea, not just remember it.
+
+- **Why before how:** always say what problem a thing solves before how it works or how to use it.
+- **Build on what they know:** start each part by linking to the previous part (or something
+  they already use) and ask what they think the idea is. Never stack a new idea on one they
+  haven't understood yet. For long parts, stop after the first big idea with one quick question.
+- **"Why" beats "what":** at least 70% of check, quiz and exam questions ask why, what if,
+  predict or trade-off.
+- **Teach it back:** at the end of each part (after the check), ask the user to explain the
+  part's main idea in about 5 sentences, as if to a junior developer. Grade it briefly (/10)
+  and save it in the notes. Skip it only if the user chooses to.
+- **Hint ladder in the lab, no copy-paste:** a question that points at the idea → the concept
+  with a small unrelated example → pseudocode → real code **only if they ask again**, and then
+  they explain it back line by line.
+- **Understanding is the gate, not the clock:** never speed up to "finish the syllabus". If the
+  user seems tired or answers are getting worse, suggest a break and continue next session.
 
 ## Teaching style
 

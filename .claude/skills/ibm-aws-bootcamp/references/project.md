@@ -62,7 +62,9 @@ Use current stable versions and check them on Day 0. Don't pin to versions from 
 
 ## Day-by-day build
 
-Each day: give the user the tasks and acceptance checks below. They write the code; you guide.
+Each day: give the user the tasks and acceptance checks below, and follow the Build block
+steps in SKILL.md: explain before building → write the code → break it → explain the code back → review.
+The **Break it** experiments are required, not optional: they are where the understanding comes from.
 
 ### Day 1: catalog-service
 - Express + TS project with `src/app.ts` (app) and `src/server.ts` (listen), so tests can
@@ -75,6 +77,13 @@ Each day: give the user the tasks and acceptance checks below. They write the co
   thrown async error → 500 without crashing); a CPU-blocking demo route shows another request
   waiting (then remove it).
 
+- **Break it** (predict → run → explain):
+  - Remove the `next()` call from a logging middleware. Why does the request hang forever?
+  - Move the error middleware *above* the routes. Why are errors no longer caught?
+  - Throw inside an `async` route handler. Check which Express major version you use:
+    Express 5 sends rejected promises to the error middleware, Express 4 doesn't. Explain why.
+  - Hit the CPU-blocking route and `/health` at the same time. Why does `/health` wait?
+
 ### Day 2: orders-service (hexagonal)
 - Layers: `domain/` (Order entity, rules, no Express or AWS imports), `application/`
   (use cases: placeOrder, getOrder), `adapters/` (http, dynamodb repository, in-memory repository).
@@ -84,6 +93,13 @@ Each day: give the user the tasks and acceptance checks below. They write the co
 - `docs/adr/001-hexagonal-orders.md`.
 - **Acceptance:** domain tests run without Docker; the idempotency test passes; the
   architecture diagram v1 is in the README.
+
+- **Break it**:
+  - Import Express (or the AWS SDK) inside `domain/`. What does this do to your tests and to
+    how easily you could change the database later?
+  - Send the same `POST /orders` twice, with and without the `Idempotency-Key`. Explain the difference.
+  - Swap the DynamoDB adapter for the in-memory one. How many files change? (It should be only
+    the wiring. If it's more, why?)
 
 ### Day 3: gateway + events
 - `gateway`: `/web/products`, `/web/orders` (full shape) and `/mobile/products` (small shape:
@@ -95,6 +111,13 @@ Each day: give the user the tasks and acceptance checks below. They write the co
 - **Acceptance:** `docker compose up` runs everything; stop catalog → the breaker opens and the
   fallback is served → start catalog → it recovers (half-open → closed), shown in the logs.
 
+- **Break it**:
+  - Remove the timeout and make catalog sleep 30 s. What happens to the gateway's open
+    connections and to users of *other* endpoints? (cascading failure)
+  - Retry 5 times with no backoff against a failing service. What does that do to the service?
+  - Make the notifications handler throw. Watch the redelivery, then the DLQ. Process the same
+    message twice with the idempotency check turned off. What does the customer see?
+
 ### Day 4: containers + first AWS deploy
 - Multi-stage Dockerfiles, non-root user, `.dockerignore`, `HEALTHCHECK`/health endpoints.
 - CDK `BaseStack` (cheap to keep: ECR repos, DynamoDB table, SQS + DLQ) and `ComputeStack`
@@ -104,6 +127,13 @@ Each day: give the user the tasks and acceptance checks below. They write the co
 - **Acceptance:** images are under ~200 MB; the ALB URL returns products; the compute stack is
   destroyed at the end of the day (checked in the console).
 
+- **Break it**:
+  - Put `COPY . .` before `npm ci`, change one source file and rebuild. Why is the build slow
+    now? (layer cache)
+  - Run `docker stop` with and without the `SIGTERM` handler while a slow request is running.
+    What happens to the request?
+  - (On AWS) point the ALB health check at a wrong path. Why does ECS keep replacing healthy tasks?
+
 ### Day 5: serverless + real AWS data
 - `notifications` as a Lambda with an SQS event source (batch size, partial batch failure
   response), DLQ, CloudWatch alarm on DLQ depth 🟡.
@@ -111,6 +141,14 @@ Each day: give the user the tasks and acceptance checks below. They write the co
 - `aws-mapping/legacy-to-aws.md`: the case study (see system-design.md, Day 5).
 - **Acceptance:** placing an order on AWS produces a Lambda log line; a poison message ends
   up in the DLQ; the task role policy only allows the needed DynamoDB actions on one table.
+
+- **Break it**:
+  - Set the Lambda timeout lower than the work it does. Why do you now get duplicates?
+  - Turn off the partial batch failure response and make 1 message out of 10 fail. What
+    happens to the other 9?
+  - Remove one DynamoDB action from the task role. Read the `AccessDenied` error. Which role,
+    which action, which resource?
+  - Thought experiment: use `status` as the partition key. Why is that a hot partition at scale?
 
 ### Day 6: web channel + CI/CD
 - Angular app: product list, product detail, cart (signals), place order, order status;
@@ -121,6 +159,15 @@ Each day: give the user the tasks and acceptance checks below. They write the co
   GitHub secrets) and runs only on manual trigger (`workflow_dispatch`) to protect credits.
 - **Acceptance:** log in on the CloudFront URL, place an order, see the notification log; the
   pipeline is green.
+
+- **Break it**:
+  - Remove the CORS config. Why does the browser fail while `curl` works?
+  - Remove the HTTP interceptor and get a 401. Decode your JWT payload locally
+    (`cut -d. -f2 <<< "$TOKEN" | base64 -d`; never paste real tokens into websites). What is inside?
+  - In a search box, use `mergeMap` instead of `switchMap` and type fast. Why do the results
+    show up in the wrong order?
+  - Give `index.html` a long `Cache-Control` max-age and deploy a change. Why do users still see
+    the old app?
 
 ### Day 7: polish
 - README: problem, architecture diagram, how to run, decisions (link the ADRs), what you would

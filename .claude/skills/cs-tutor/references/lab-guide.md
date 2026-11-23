@@ -122,7 +122,10 @@ Pseudocode-level guidance, still not the full code.
 
 ## 5. Reviewing a submission ("review my lab")
 
-1. Run `./check.sh` and report the results.
+1. Run `./check.sh` and report the results. Then **explain-back**: point at 2–3 important
+   lines of *their* code and ask "why is this here? what happens if you remove or move it?"
+   End your turn and grade the answers before writing the review. Also use the hint ladder
+   (SKILL.md, "Deep understanding") whenever they ask for help during the lab.
 2. Read every file they changed (`git diff` against the commit that added the starter code).
 3. Review like a senior engineer on a real PR. Group the findings by severity:
    - 🔴 **Bugs / correctness**: wrong behavior, race conditions, leaks (fds, memory, zombies),

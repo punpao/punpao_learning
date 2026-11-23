@@ -93,7 +93,7 @@ section current.
 ## Status
 - **Phase:** <1-syllabus-review | 2-teaching | 3-lab | 4-exam | 5-wrap-up | done>
 - **Current part:** <NN: Title | —>
-- **Current step:** <syllabus-review | teaching | awaiting-prediction | awaiting-check-answers | menu | lab-in-progress | lab-submitted | exam-in-progress | exam-graded | —>
+- **Current step:** <syllabus-review | teaching | awaiting-prediction | awaiting-check-answers | awaiting-teach-back | menu | lab-in-progress | lab-submitted | exam-in-progress | exam-graded | —>
 - **Last updated:** <YYYY-MM-DD>
 
 ## Parts
@@ -174,6 +174,11 @@ section current.
 **Q1.** <question>
 - **My answer (summary):** <…>
 - **Feedback:** <right / wrong / partially + correction>
+
+## Teach it back: <score>/10
+> <the user's ~5-sentence explanation>
+
+- **Feedback:** <gaps or mistakes>
 
 ## Follow-up questions
 <!-- appended as they happen -->
