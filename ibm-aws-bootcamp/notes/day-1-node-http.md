@@ -154,3 +154,11 @@ function greet() { console.log("hi"); return Promise.resolve(undefined); }
 - Network → OS, no thread. Files / crypto / zlib / dns.lookup → pool. Plain-JS CPU work → blocks everyone.
 - Fix CPU-heavy work: async API, worker_threads, or another service.
 - Streams/backpressure and SIGTERM graceful shutdown: covered during the build.
+
+### Break-it result: removing `return` after the 404 (tested on Express 5.3, 2026-11-24)
+- Client still gets the 404. The handler keeps running after the first response.
+- Next line `res.json(product)` with `product === undefined`: **silent**, no error (nothing new to send).
+- Next line `res.json({ ok: 1 })`: server logs `ERR_HTTP_HEADERS_SENT`.
+- Next line `res.json({ name: product.name })`: server logs `TypeError`.
+- Lesson: one request gets one response; always `return` after sending, because the bug can be silent.
+- Explain-back: express.json parses JSON bodies only for `Content-Type: application/json` (without it req.body is undefined). `req.params.id` is always a string because the URL is text, so number ids make `1 === "1"` false and every product 404s.
