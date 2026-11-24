@@ -15,8 +15,8 @@
 
 ## Status
 - **Current day:** 1 (planned 2026-11-24, started early 2026-11-23 23:22)
-- **Current block:** 1.1 done, next 1.2 Node.js (V8 + libuv, thread pool, blocking demo)
-- **Current step:** menu after 1.1 (about-me still empty)
+- **Current block:** 1.2 done → next 1.3 HTTP + Express
+- **Current step:** menu after 1.2 (about-me still empty)
 - **Pace:** on track
 
 ## Days
@@ -59,3 +59,4 @@
 - 2026-11-23: Plan approved by user. Dates confirmed: Day 1 2026-11-24 … Day 7 2026-11-30. User chose to start Day 1 early at 2026-11-23 23:22 Bangkok.
 - 2026-11-24: Block 1.1 in progress with the coach in the project thread. First commit + push of the bootcamp folder.
 - 2026-11-24: Block 1.1 done (event loop, micro/macro tasks, promises, async/await, unhandled rejections).
+- 2026-11-24: Block 1.2 done (V8 + libuv, OS vs thread pool, blocking demo).

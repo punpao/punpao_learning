@@ -111,3 +111,46 @@ function greet() { console.log("hi"); return Promise.resolve(undefined); }
 - ❌ `async` makes the whole function run later → ✅ the body runs now, up to the first `await`.
 - ❌ `try/catch` catches errors from any async call inside it → ✅ only if you `await` it (or `.catch`).
 - ❌ A heavy loop just makes one request slow → ✅ it freezes the whole process for everyone.
+
+## Block 1.2: Node.js
+
+### Idea 1: Node = V8 + libuv, non-blocking I/O
+- **V8** runs JS (call stack, one thread). It can't do I/O by itself.
+- **libuv** (C library) runs the event loop and timers and hands waiting to the **OS** ("tell me when this connection has data"). The JS thread is free meanwhile.
+- **Non-blocking I/O**: the thread doesn't stand still while waiting for files/network/DB.
+
+**Check:** 100 requests, each a 200 ms DB query. #100 waits how long (1) if the thread stood and waited, (2) with libuv?
+**My answer:** (1) queries run in parallel outside JS; #100 only waits for the first 99 callbacks. (2) "huh?"
+**Feedback:** My (1) is the correct answer to (2) ✅: ~200 ms + a little for 99 short callbacks. (1) was the imaginary blocking world: 100 × 200 ms = 20 s. Demo with 10 requests (ran it): blocking 2000 ms vs non-blocking 201 ms.
+
+### Idea 2: the thread pool (libuv, 4 threads by default)
+- **Waiting for network data** (DB, HTTP): OS "doorbell" (epoll / kqueue) watches thousands of connections; no thread waits.
+- **Work someone must do or stand through**: hashing (`crypto.pbkdf2`, bcrypt), compression (`zlib`), `dns.lookup`, and **files** (no doorbell for files on most OSes) → a thread-pool thread.
+```text
+ Network (DB, HTTP)     → OS doorbell   → no thread waits
+ Files                  → no doorbell   → a pool thread stands and waits
+ Hashing / compressing  → real CPU work → a pool thread does the work
+```
+- Analogy: JS thread = waiter; pool = 4 cooks.
+- Demo (4 threads): 8 pbkdf2 hashes → 4 done at ~140 ms, 4 at ~285 ms. With UV_THREADPOOL_SIZE=8 on 4 cores: all ~290 ms (more threads don't beat CPU cores).
+**Check:** 8 orders × 10 min, 4 cooks → **My answer:** 20 min ✅ (4 at 10, 4 at 20).
+
+### Idea 3: never make the waiter cook (blocking the event loop)
+- CPU work in plain JS (loops, `pbkdf2Sync`, huge `JSON.parse`) runs on the main JS thread → every request waits.
+- Demo: `/slow` = 3 s busy loop; `/fast` sent 0.2 s later took **2.86 s**.
+- Fixes: async API (pool), `worker_threads`, or move work to another service/queue (Lambda); keep handlers short.
+
+**Check:** login with `pbkdf2Sync` (100 ms), 50 logins at once. **My answer:** 1) ~5000 ms, 2) product page hangs, 3) use `crypto.pbkdf2` ✅✅✅
+**Feedback:** Word fix: "main JS thread", not "worker thread" (that's `worker_threads`). Deeper: with async pbkdf2 and 4 pool threads, #50 still waits ~13 rounds × 100 ms ≈ 1.3 s, but the product page stays fast.
+
+### Block 1.2 traps
+- ❌ Node is single-threaded → ✅ *your JS* runs on one thread; Node uses the thread pool + OS in the background.
+- ❌ Async means parallel on the JS thread → ✅ the JS thread hands off the work and stays free.
+- ❌ All async work uses the thread pool → ✅ network uses the OS doorbell; files, crypto, zlib, dns.lookup use the pool.
+- ❌ `*Sync` functions are fine in a server → ✅ they block every request; only at startup.
+
+## TL;DR (block 1.2)
+- Node = V8 (runs JS, one thread) + libuv (event loop, timers, OS I/O, thread pool of 4).
+- Network → OS, no thread. Files / crypto / zlib / dns.lookup → pool. Plain-JS CPU work → blocks everyone.
+- Fix CPU-heavy work: async API, worker_threads, or another service.
+- Streams/backpressure and SIGTERM graceful shutdown: covered during the build.
