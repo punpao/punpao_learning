@@ -10,7 +10,8 @@ My personal repository for learning computer science fundamentals properly, with
 
 | Topic | Status | Progress | Exam score | Started | Completed |
 |---|---|---|---|---|---|
-| [IBM AWS Bootcamp](ibm-aws-bootcamp/) | 📝 Syllabus | Day 0/7 | Exam —, SD mock — | 2026-11-23 | — |
+| [How a Computer Works](how-a-computer-works/) | 📖 Learning | Part 4/8 | — | 2026-11-20 | — |
+| [IBM AWS Bootcamp](ibm-aws-bootcamp/) | 📖 Learning | Day 1/7 | Exam —, SD mock — | 2026-11-23 | — |
 
 **Status legend:** 📝 Syllabus · 📖 Learning · 🧪 Lab · 🎯 Exam · ✅ Done
 
