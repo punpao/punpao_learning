@@ -10,7 +10,7 @@ My personal repository for learning computer science fundamentals properly, with
 
 | Topic | Status | Progress | Exam score | Started | Completed |
 |---|---|---|---|---|---|
-| _No topics yet. Start one with `teach me operating systems`._ | | | | | |
+| [IBM AWS Bootcamp](ibm-aws-bootcamp/) | 📝 Syllabus | Day 0/7 | Exam —, SD mock — | 2026-11-23 | — |
 
 **Status legend:** 📝 Syllabus · 📖 Learning · 🧪 Lab · 🎯 Exam · ✅ Done
 
