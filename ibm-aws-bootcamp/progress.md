@@ -2,7 +2,7 @@
 
 ## Setup
 - **Region:** ap-southeast-2 (Sydney)
-- **AWS account:** 875706244209 (member of an AWS Organization; management account 097083345455)
+- **AWS account:** 8757XXXXXXXX (member of an AWS Organization; management account 0970XXXXXXXX)
 - **Sign-in:** `aws login` (console sign-in → short-lived credentials) as role `AccountFullAccessRole` (AdministratorAccess). No IAM users, no access keys, no IAM Identity Center.
 - **AWS credits:** start $120 · now $120 (checked 2026-11-23)
 - **Free plan:** ACTIVE, expires 2027-05-23
@@ -14,15 +14,15 @@
 - **Hours per day:** 10–12
 
 ## Status
-- **Current day:** 1 (planned 2026-11-24; started early 2026-11-23 23:22 Bangkok)
-- **Current block:** 1.1 JS runtime (in progress: covered event loop order, microtasks vs macrotasks, promises, async/await + try/catch)
-- **Current step:** teaching (Day 0 leftover: about-me still empty)
+- **Current day:** 1 (planned 2026-11-24, started early 2026-11-23 23:22)
+- **Current block:** 1.1 done, next 1.2 Node.js (V8 + libuv, thread pool, blocking demo)
+- **Current step:** menu after 1.1 (about-me still empty)
 - **Pace:** on track
 
 ## Days
 | Day | Theme | Planned | Status | Quiz | Teach-back | SD score | Notes |
 |---|---|---|---|---|---|---|---|
-| 0 | Setup | 2026-11-23 | ✅ (about-me pending) | — | — | — | — |
+| 0 | Setup | 2026-11-23 | ✅ done (CDK bootstrapped, budget, plan approved, root MFA N/A) | — | — | — | — |
 | 1 | JS, Node.js, HTTP | 2026-11-24 (started 2026-11-23) | 📖 | | | | [notes](notes/day-1-node-http.md) |
 | 2 | Architecture and API design | 2026-11-25 | ⏳ | | | | |
 | 3 | Microservices + Netflix OSS ideas | 2026-11-26 | ⏳ | | | | |
@@ -37,7 +37,11 @@
 ## Weak spots
 | Concept | Evidence | Source | Status |
 |---|---|---|---|
-| IAM user vs role vs group | Said "IAM user is a credential" and "a role is a set of roles assigned to each user" | Day 0 chat | 🟡 Corrected; revisit in Day 4.3 |
+| async function body runs sync until first await | Predicted C,A,B then bye,hi | Day 1 1.1 part 3 | 🔴 Open after 2 rounds, revisit in warm-up |
+| resolve() moves .then callbacks from the promise's list to the microtask queue | Couldn't answer t=0 vs t=1000; mixed up what resolve does | Day 1 1.1 part 2 | 🟡 Partly, revisit in warm-up |
+| Microtasks before tasks; sync before both | A C D B at 1 AM, then S P1 P2 T1 T2 right | Day 1 1.1 part 2 | 🟢 Resolved (re-check) |
+| setTimeout(0) waits until stack empty; busy loop = hang, not error | 1,2,3 for busy loop, then correct rule | Day 1 1.1 part 1 | 🟢 Resolved (re-check) |
+| IAM role = identity you *become*, not a label on a user (execution role) | 'role assigned to each user'; 'role to assume to user to control access to Lambda' | Day 0 check | 🔴 Open after 2 rounds, revisit Day 2 warm-up |
 
 ## System design scores
 | Day | Problem | Score | Main gap |
@@ -54,3 +58,4 @@
 - 2026-11-23: CDK bootstrap run after owner's yes; CDKToolkit CREATE_COMPLETE.
 - 2026-11-23: Plan approved by user. Dates confirmed: Day 1 2026-11-24 … Day 7 2026-11-30. User chose to start Day 1 early at 2026-11-23 23:22 Bangkok.
 - 2026-11-24: Block 1.1 in progress with the coach in the project thread. First commit + push of the bootcamp folder.
+- 2026-11-24: Block 1.1 done (event loop, micro/macro tasks, promises, async/await, unhandled rejections).
