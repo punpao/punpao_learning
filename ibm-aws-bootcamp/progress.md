@@ -16,7 +16,7 @@
 ## Status
 - **Current day:** 1 (planned 2026-11-24, started early 2026-11-23 23:22)
 - **Current block:** 1.2 done → next 1.3 HTTP + Express
-- **Current step:** Task 1 done (all 5 routes pass, explain-back done). Next: Task 2, validate POST /products with zod (400 on bad input).
+- **Current step:** Task 2 done (zod on POST /products, 7/7 checks pass). Explain-back pending: randomUUID vs length+1, result.data vs req.body, no Content-Type case. Next: Task 3, central error handler + JSON 404 handler.
 - **Pace:** on track
 
 ## Days
@@ -61,3 +61,4 @@
 - 2026-11-24: Block 1.1 done (event loop, micro/macro tasks, promises, async/await, unhandled rejections).
 - 2026-11-24: Block 1.2 done (V8 + libuv, OS vs thread pool, blocking demo).
 - 2026-11-24: Build started. Coach wrote minimal app.ts (GET /products, GET /products/:id, POST /products) + server.ts (listen 3000) on user request; all 3 routes checked with curl.
+- 2026-11-26: Task 2 done: zod schema (name min 4, price >= 0), safeParse → 400 with field issues, server-made id (randomUUID) → 201. Checked 5 cases with curl.

@@ -162,3 +162,10 @@ function greet() { console.log("hi"); return Promise.resolve(undefined); }
 - Next line `res.json({ name: product.name })`: server logs `TypeError`.
 - Lesson: one request gets one response; always `return` after sending, because the bug can be silent.
 - Explain-back: express.json parses JSON bodies only for `Content-Type: application/json` (without it req.body is undefined). `req.params.id` is always a string because the URL is text, so number ids make `1 === "1"` false and every product 404s.
+
+### Task 2: validation with zod (2026-11-26)
+- A zod schema is a set of rules. `schema.safeParse(data)` never throws; it returns `{ success: true, data }` or `{ success: false, error }` where `error.issues` lists every problem with its `path` (field) and `message`. `schema.parse(data)` throws instead.
+- `z.object` drops keys that are not in the schema, so a client-sent `id` is ignored. Build the product from `result.data`, never raw `req.body`.
+- The server makes the id (`randomUUID()`); the client must never choose it.
+- Check types, not only values: in JS `"100" >= 0` is true, so `z.number()` matters.
+- Without `Content-Type: application/json`, `req.body` is undefined, so zod reports "expected object, received undefined" with an empty field name.
