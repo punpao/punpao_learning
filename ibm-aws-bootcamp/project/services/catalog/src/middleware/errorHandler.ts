@@ -26,6 +26,7 @@ export function errorHandler(
   }
 
   // Anything else is our bug: full details (with stack) in the server log only.
-  console.error(err);
+  // req.log is the pino-http child logger, so this line carries the request id.
+  req.log.error({ err }, "unhandled error");
   sendProblem(req, res, 500, "Something went wrong on our side");
 }

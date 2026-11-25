@@ -180,3 +180,11 @@ function greet() { console.log("hi"); return Promise.resolve(undefined); }
 - Express's default 404 is HTML (it was built for websites); an API must answer JSON every time, or clients fail with `SyntaxError: Unexpected token '<'`.
 - notFound goes after all routers, errorHandler last. Errors use RFC 9457 `application/problem+json` {type, title, status, detail, instance}. The stack goes to the server log only, never to the client.
 - 4xx = the client sent something wrong (we caught it); 5xx = our side failed (the server keeps running). Broken JSON is 400 because the client is at fault.
+
+### Task 4: structured logging with pino + request id (2026-11-26)
+- `console.log` text can't tell which line belongs to which request. pino writes one JSON object per line (level, time, fields), so tools like CloudWatch Logs Insights can search it.
+- What you need to know about pino-http: put it first in app.ts; every request gets `req.log` (a logger that already carries the request id); it writes one "request completed" line when the response finishes, with status and responseTime; `genReqId` decides the id (reuse the client's `x-request-id`, else `randomUUID()`).
+- The id is sent back in the `x-request-id` response header, like a parcel tracking number: users report it, devs search logs for it, and other services pass it along so one request can be traced across services.
+- Logs go to stdout (the terminal). On AWS Lambda/ECS, stdout goes to CloudWatch Logs automatically. For readable logs in dev: `npm run dev | npx pino-pretty`.
+- Never log secrets (tokens, cookies, passwords): anyone who reads the log could act as that user. pino's `redact` option replaces them with "[Redacted]".
+- Levels: 30 = info, 50 = error. A 5xx response gets an extra "request errored" line from pino-http.

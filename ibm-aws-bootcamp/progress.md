@@ -16,7 +16,7 @@
 ## Status
 - **Current day:** 1 (planned 2026-11-24, started early 2026-11-23 23:22)
 - **Current block:** 1.2 done → next 1.3 HTTP + Express
-- **Current step:** Task 3 + 3b done (all errors are problem+json). Next: Task 4, logging with pino-http + x-request-id.
+- **Current step:** Task 4 + 4b done (pino-http, x-request-id, redact). Next: Task 5, tests with vitest + supertest and break-it experiments.
 - **Pace:** on track
 
 ## Days
@@ -65,3 +65,5 @@
 - 2026-11-26: Task 3 done: sendProblem helper (RFC 9457), 404 catch-all, 4-param error handler (keeps 4xx like bad JSON, else 500 + console.error, no stack to client), GET /boom. Checked 6 cases with curl.
 - 2026-11-26: Task 3 redone after user split code into routes/ data/ schemas/: notFound + errorHandler middleware files, shared sendProblem (RFC 9457), /boom. Checked with curl; stack only in server log.
 - 2026-11-26: products.routes 404 + zod 400 switched to sendProblem (issues kept as extension field). All errors now problem+json.
+- 2026-11-26: Task 4 done: pino logger (LOG_LEVEL, default info), pino-http first middleware with genReqId (client x-request-id ≤128 chars or randomUUID, echoed in response), errorHandler uses req.log.error({ err }). Checked headers + JSON log lines.
+- 2026-11-26: Task 4b done: pinoHttp redact for req.headers.authorization + req.headers.cookie → "[Redacted]". Checked: 0 secrets in log, all 3 line types redacted.
