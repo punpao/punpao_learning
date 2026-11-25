@@ -2,6 +2,7 @@
 import { Router } from "express";
 import { createProductSchema } from "../schemas/product.schema.js";
 import { createProduct, findAllProducts, findProductById } from "../data/products.store.js";
+import { sendProblem } from "../http/problem.js";
 
 export const productsRouter = Router();
 
@@ -14,7 +15,7 @@ productsRouter.get("/", (_req, res) => {
 productsRouter.get("/:id", (req, res) => {
   const product = findProductById(req.params.id);
   if (!product) {
-    res.status(404).json({ error: "Product not found" });
+    sendProblem(req, res, 404, `Product ${req.params.id} does not exist`);
     return; // one request gets one response
   }
   res.json(product);
@@ -24,8 +25,8 @@ productsRouter.get("/:id", (req, res) => {
 productsRouter.post("/", (req, res) => {
   const result = createProductSchema.safeParse(req.body);
   if (!result.success) {
-    res.status(400).json({
-      error: "Invalid request body",
+    sendProblem(req, res, 400, "The request body is not valid", {
+      // Extra field ("extension member"): which fields are wrong and why.
       issues: result.error.issues.map((issue) => ({
         field: issue.path.join("."),
         message: issue.message,

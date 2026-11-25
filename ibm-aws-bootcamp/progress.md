@@ -16,7 +16,7 @@
 ## Status
 - **Current day:** 1 (planned 2026-11-24, started early 2026-11-23 23:22)
 - **Current block:** 1.2 done → next 1.3 HTTP + Express
-- **Current step:** Refactored catalog into routes/schemas/data/middleware at the owner's request. Next: Task 3 (404 handler + error handler in middleware/).
+- **Current step:** Task 3 + 3b done (all errors are problem+json). Next: Task 4, logging with pino-http + x-request-id.
 - **Pace:** on track
 
 ## Days
@@ -63,3 +63,5 @@
 - 2026-11-24: Build started. Coach wrote minimal app.ts (GET /products, GET /products/:id, POST /products) + server.ts (listen 3000) on user request; all 3 routes checked with curl.
 - 2026-11-26: Task 2 done: zod schema (name min 4, price >= 0), safeParse → 400 with field issues, server-made id (randomUUID) → 201. Checked 5 cases with curl.
 - 2026-11-26: Task 3 done: sendProblem helper (RFC 9457), 404 catch-all, 4-param error handler (keeps 4xx like bad JSON, else 500 + console.error, no stack to client), GET /boom. Checked 6 cases with curl.
+- 2026-11-26: Task 3 redone after user split code into routes/ data/ schemas/: notFound + errorHandler middleware files, shared sendProblem (RFC 9457), /boom. Checked with curl; stack only in server log.
+- 2026-11-26: products.routes 404 + zod 400 switched to sendProblem (issues kept as extension field). All errors now problem+json.

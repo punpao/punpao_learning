@@ -173,3 +173,10 @@ function greet() { console.log("hi"); return Promise.resolve(undefined); }
 ### Folder structure (2026-11-26)
 - `app.ts` wires things together; `routes/` handle HTTP only; `schemas/` hold zod rules; `data/` is the only place that knows where data lives; `middleware/` holds code that runs for many routes (404, errors, logging).
 - Why: each file has one job (separation of concerns), so a change in one place (e.g. swap the in-memory array for DynamoDB) does not touch the others, and each part can be tested alone.
+
+### Task 3: middleware chain, 404 and error handler (2026-11-26)
+- Express keeps middleware in an array in `app.use` order and walks it with `next()`. Each step either answers (`res.json`) or passes on (`next()`); doing neither makes the request hang (tested: curl timed out).
+- Memory line: "Holding an error? No: stop only at 3-param middleware. Yes: stop only at 4-param middleware." Express wraps each layer in try/catch, so `throw` becomes `next(err)`; it spots error handlers by `fn.length === 4`.
+- Express's default 404 is HTML (it was built for websites); an API must answer JSON every time, or clients fail with `SyntaxError: Unexpected token '<'`.
+- notFound goes after all routers, errorHandler last. Errors use RFC 9457 `application/problem+json` {type, title, status, detail, instance}. The stack goes to the server log only, never to the client.
+- 4xx = the client sent something wrong (we caught it); 5xx = our side failed (the server keeps running). Broken JSON is 400 because the client is at fault.
