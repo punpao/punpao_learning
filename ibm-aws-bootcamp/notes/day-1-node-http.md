@@ -169,3 +169,7 @@ function greet() { console.log("hi"); return Promise.resolve(undefined); }
 - The server makes the id (`randomUUID()`); the client must never choose it.
 - Check types, not only values: in JS `"100" >= 0` is true, so `z.number()` matters.
 - Without `Content-Type: application/json`, `req.body` is undefined, so zod reports "expected object, received undefined" with an empty field name.
+
+### Folder structure (2026-11-26)
+- `app.ts` wires things together; `routes/` handle HTTP only; `schemas/` hold zod rules; `data/` is the only place that knows where data lives; `middleware/` holds code that runs for many routes (404, errors, logging).
+- Why: each file has one job (separation of concerns), so a change in one place (e.g. swap the in-memory array for DynamoDB) does not touch the others, and each part can be tested alone.
