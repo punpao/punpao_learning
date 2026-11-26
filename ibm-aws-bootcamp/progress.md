@@ -16,7 +16,7 @@
 ## Status
 - **Current day:** 1 (planned 2026-11-24, started early 2026-11-23 23:22)
 - **Current block:** 1.2 done → next 1.3 HTTP + Express
-- **Current step:** Task 4 + 4b done (pino-http, x-request-id, redact). Next: Task 5, tests with vitest + supertest and break-it experiments.
+- **Current step:** Task 5 given: tests with vitest + supertest (light version), then break-it.
 - **Pace:** on track
 
 ## Days
