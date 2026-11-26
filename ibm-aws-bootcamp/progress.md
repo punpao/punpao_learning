@@ -15,8 +15,8 @@
 
 ## Status
 - **Current day:** A (compressed plan)
-- **Current block:** Build A2 done
-- **Current step:** Day A: A2 done (repository interface + in-memory + DI, 18 tests). Next: A2b DynamoDB Local repository (Docker 29.2 is running).
+- **Current block:** Build A2b done
+- **Current step:** Day A: A2b done (DynamoDB on AWS via repository). Next: A3 Dockerfile for catalog.
 - **Pace:** on track
 - Plan: compressed to 3.5 days on 2026-11-26 (see plan-compressed.md).
 
@@ -53,6 +53,7 @@
 |---|---|---|---|---|
 | Budget `bootcamp-monthly` | (console) | 2026-11-23 | free | ✅ active |
 | CDKToolkit (S3 staging bucket, ECR repo, 5 IAM roles, SSM param) | CDKToolkit | 2026-11-23 | ~$0 (cents/month) | ✅ keep until Day 7 |
+| DynamoDB table catalog-products-dev (on-demand, key id; created by owner in Console) | (no stack) | 2026-11-26 | ~$0 | ✅ delete at Day D teardown |
 
 ## Session log
 - 2026-11-23: Day 0. Checked AWS identity, sign-in method and IAM (0 users, admin role via `aws login`). Found budget and free plan already set up. All tools installed. Created folder and progress file.
@@ -76,3 +77,4 @@
 - 2026-11-26: User saw 'Empty reply' on /slow + Ctrl+C under npm run dev. Cause: tsx watch force-kills the child on Ctrl+C ('Previous process hasn't exited yet. Force killing...'). Code is fine: npm start, node dist/server.js, tsx (no watch) all return 200 then exit 0. Test shutdown with build + start.
 - 2026-11-26: /boom + /slow only when NODE_ENV !== production (tests/production.test.ts guards it; mutant 'prod' caught; built app with NODE_ENV=production → 404). server.ts: unhandledRejection + uncaughtException → logger.fatal({ err }) + exit(1), both verified (level 60, stack, exit 1). 13 tests pass.
 - 2026-11-26: Repository refactor: ProductRepository interface (async), InMemoryProductRepository (copies in/out), createApp({ productRepo }), createProductsRouter(repo) with await, server.ts = composition root with Keyboard/Mouse seed, tests beforeEach fresh repo+app, repo unit tests, products.store.ts deleted. 18 tests pass; mutant 'findAll returns real array' caught.
+- 2026-11-26: DynamoProductRepository (Scan with LastEvaluatedKey loop, Get ConsistentRead, Put with attribute_not_exists(id)). server.ts: STORAGE=dynamo → DynamoDB (AWS_REGION default ap-southeast-2, TABLE_NAME default catalog-products-dev), else in-memory. No keys in code; aws login creds worked. Verified READ-ONLY on real table (GET list 200 with Keyboard+Mouse, GET unknown 404). POST to real table not run yet (waiting for user's yes). 18 tests (in-memory) pass.

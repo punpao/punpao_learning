@@ -1,7 +1,11 @@
 // server.ts: the entry point that starts the real server.
 // app.ts builds the app; this file opens the port and handles shutdown.
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { createApp } from "./app.js"; // ".js" even though the file is app.ts (NodeNext rule)
+import { DynamoProductRepository } from "./data/dynamo.product.repository.js";
 import { InMemoryProductRepository } from "./data/inMemory.product.repository.js";
+import type { ProductRepository } from "./data/product.repository.js";
 import { logger } from "./logger.js";
 
 // Last line of defense: an error that NO code caught.
@@ -30,13 +34,25 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) {
 }
 
 // This is the ONE place that picks the real dependencies ("composition root").
-// Day 2: swap in a DynamoDB repository here; nothing else changes.
-const app = createApp({
-  productRepo: new InMemoryProductRepository([
+// STORAGE=dynamo → DynamoDB table; anything else → in-memory (local dev, no AWS needed).
+function createProductRepo(): ProductRepository {
+  if (process.env.STORAGE === "dynamo") {
+    const region = process.env.AWS_REGION ?? "ap-southeast-2";
+    const tableName = process.env.TABLE_NAME ?? "catalog-products-dev";
+    // No credentials passed: the SDK's default chain finds them
+    // (aws login locally, the ECS task role in the cloud).
+    const docClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region }));
+    logger.info({ storage: "dynamo", region, tableName }, "using DynamoDB repository");
+    return new DynamoProductRepository(docClient, tableName);
+  }
+  logger.info({ storage: "memory" }, "using in-memory repository");
+  return new InMemoryProductRepository([
     { id: "1", name: "Keyboard", price: 1290 },
     { id: "2", name: "Mouse", price: 590 },
-  ]),
-});
+  ]);
+}
+
+const app = createApp({ productRepo: createProductRepo() });
 
 // Express 5 passes listen errors (e.g. EADDRINUSE: port already in use) to this callback.
 const server = app.listen(port, (err?: Error) => {

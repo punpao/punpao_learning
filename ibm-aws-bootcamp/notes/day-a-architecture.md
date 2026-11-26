@@ -12,3 +12,9 @@
 - Dependency injection = hand the repository in (`createApp({ productRepo })`, `createProductsRouter(repo)`) instead of letting routes fetch it themselves.
 - `server.ts` is the one place that picks the real parts ("composition root"); tests pass a fresh in-memory repository for every test, so tests no longer share state.
 - Analogy: the route is a chef; the repository is the supplier; the chef only needs ingredients that match the order list.
+
+## A2b: real DynamoDB on AWS (2026-11-26)
+- Created table `catalog-products-dev` myself in the Console: ap-southeast-2, partition key `id` (String), on-demand billing. DynamoDB stores typed values (`{"N": "1290"}`); the DocumentClient converts to plain JS objects.
+- `DynamoProductRepository` implements the same `ProductRepository` interface: findAll → Scan (reads every item: fine for a few items, too slow at large scale), findById → GetItem by key (fast), create → PutItem with `attribute_not_exists(id)` so it never overwrites.
+- `server.ts` picks the repository with `STORAGE=dynamo`; routes and tests did not change. That is the payoff of the repository pattern + dependency injection.
+- Credentials: DynamoDB has no connection string; every request is signed with IAM credentials. On my Mac the SDK uses my `aws login` session (expires about every 12 h on purpose). On AWS (ECS/Lambda) the service gets an IAM role (task role) and temporary credentials automatically. Never put access keys in code or a committed .env (the repo is public; bots scan GitHub for keys).
