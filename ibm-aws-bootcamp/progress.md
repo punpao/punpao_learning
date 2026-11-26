@@ -15,8 +15,8 @@
 
 ## Status
 - **Current day:** A (compressed plan)
-- **Current block:** Build A2b done
-- **Current step:** Day A: A2b done (DynamoDB on AWS via repository). Next: A3 Dockerfile for catalog.
+- **Current block:** Build A3 done
+- **Current step:** Day A: A3 done (Docker image 61 MB content, graceful stop works). Next: Day A system design (SQL vs NoSQL, orders data model), then Day B: deploy to AWS.
 - **Pace:** on track
 - Plan: compressed to 3.5 days on 2026-11-26 (see plan-compressed.md).
 
@@ -78,3 +78,4 @@
 - 2026-11-26: /boom + /slow only when NODE_ENV !== production (tests/production.test.ts guards it; mutant 'prod' caught; built app with NODE_ENV=production → 404). server.ts: unhandledRejection + uncaughtException → logger.fatal({ err }) + exit(1), both verified (level 60, stack, exit 1). 13 tests pass.
 - 2026-11-26: Repository refactor: ProductRepository interface (async), InMemoryProductRepository (copies in/out), createApp({ productRepo }), createProductsRouter(repo) with await, server.ts = composition root with Keyboard/Mouse seed, tests beforeEach fresh repo+app, repo unit tests, products.store.ts deleted. 18 tests pass; mutant 'findAll returns real array' caught.
 - 2026-11-26: DynamoProductRepository (Scan with LastEvaluatedKey loop, Get ConsistentRead, Put with attribute_not_exists(id)). server.ts: STORAGE=dynamo → DynamoDB (AWS_REGION default ap-southeast-2, TABLE_NAME default catalog-products-dev), else in-memory. No keys in code; aws login creds worked. Verified READ-ONLY on real table (GET list 200 with Keyboard+Mouse, GET unknown 404). POST to real table not run yet (waiting for user's yes). 18 tests (in-memory) pass.
+- 2026-11-27: .dockerignore + multi-stage Dockerfile (node:24.13.0-alpine, npm ci --omit=dev, NODE_ENV=production, USER node, exec-form CMD). Image: 200 MB uncompressed (base 161), 61 MB compressed. Verified: uid node, PID 1 = node, no devDeps/tests/.env, /boom+/slow 404, docker stop → SIGTERM graceful exit 0 in 0.2 s.
