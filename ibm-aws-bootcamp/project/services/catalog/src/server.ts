@@ -3,6 +3,23 @@
 import { app } from "./app.js"; // ".js" even though the file is app.ts (NodeNext rule)
 import { logger } from "./logger.js";
 
+// Last line of defense: an error that NO code caught.
+// - unhandledRejection: a promise rejected and nobody had .catch() or try/await.
+// - uncaughtException: a throw outside any try/catch, e.g. inside a setTimeout callback.
+// Express 5 already catches errors in route handlers, so these mean a bug elsewhere.
+// After such an error the process may be in a broken state, so we do NOT keep going:
+// log it (fatal = highest level, so alarms can match it) and exit(1).
+// ECS sees the non-zero exit and starts a fresh task.
+// Registered before listen(). (The imports above still run first: imports always do.)
+process.on("unhandledRejection", (reason) => {
+  logger.fatal({ err: reason }, "unhandled promise rejection, exiting");
+  process.exit(1);
+});
+process.on("uncaughtException", (err) => {
+  logger.fatal({ err }, "uncaught exception, exiting");
+  process.exit(1);
+});
+
 // PORT comes from the environment (ECS, Docker, etc. set it). Default 3000 for local dev.
 // Fail fast on a bad value instead of quietly using a different port.
 const port = Number(process.env.PORT ?? 3000);

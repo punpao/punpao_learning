@@ -16,8 +16,9 @@
 ## Status
 - **Current day:** 1 (planned 2026-11-24, started early 2026-11-23 23:22)
 - **Current block:** 1.2 done → next 1.3 HTTP + Express
-- **Current step:** Day 1 build Tasks 1–6 done. Code review in project/reviews/day-1.md (2 red items: test routes in prod, no crash handlers). Next: review explain-back, then Day 1 system design (URL shortener) and review block.
+- **Current step:** Day A: A1 done (NODE_ENV gate for test routes, crash handlers). Next: A2 repository pattern + DynamoDB Local.
 - **Pace:** on track
+- Plan: compressed to 3.5 days on 2026-11-26 (see plan-compressed.md).
 
 ## Days
 | Day | Theme | Planned | Status | Quiz | Teach-back | SD score | Notes |
@@ -72,3 +73,5 @@
 - 2026-11-26: User ran a mutation test (min(0) → min(-100)): all tests stayed green, so the price rule was unguarded. Added boundary tests (-1 → 400, 0 → 201); they catch min(-100) and .positive(). Schema restored to min(0). Lesson: green tests ≠ correct code.
 - 2026-11-26: server.ts: PORT from env (validated, default 3000, exit 1 if bad), listen errors (EADDRINUSE) → fatal + exit 1, SIGTERM/SIGINT → server.close(), in-flight finish, 10s forced-exit timer. Verified: in-flight POST got 201 after SIGTERM, new connection refused, exit 0.
 - 2026-11-26: Added GET /slow (5 s, async, non-blocking). Found keep-alive gap: exit 3 s after last response; fixed with closeIdleConnections() every 250 ms during shutdown → exit right after response (5.2 s).
+- 2026-11-26: User saw 'Empty reply' on /slow + Ctrl+C under npm run dev. Cause: tsx watch force-kills the child on Ctrl+C ('Previous process hasn't exited yet. Force killing...'). Code is fine: npm start, node dist/server.js, tsx (no watch) all return 200 then exit 0. Test shutdown with build + start.
+- 2026-11-26: /boom + /slow only when NODE_ENV !== production (tests/production.test.ts guards it; mutant 'prod' caught; built app with NODE_ENV=production → 404). server.ts: unhandledRejection + uncaughtException → logger.fatal({ err }) + exit(1), both verified (level 60, stack, exit 1). 13 tests pass.
