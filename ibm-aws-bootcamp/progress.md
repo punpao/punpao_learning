@@ -14,9 +14,9 @@
 - **Hours per day:** 10–12
 
 ## Status
-- **Current day:** 1 (planned 2026-11-24, started early 2026-11-23 23:22)
-- **Current block:** 1.2 done → next 1.3 HTTP + Express
-- **Current step:** Day A: A1 done (NODE_ENV gate for test routes, crash handlers). Next: A2 repository pattern + DynamoDB Local.
+- **Current day:** A (compressed plan)
+- **Current block:** Build A2 done
+- **Current step:** Day A: A2 done (repository interface + in-memory + DI, 18 tests). Next: A2b DynamoDB Local repository (Docker 29.2 is running).
 - **Pace:** on track
 - Plan: compressed to 3.5 days on 2026-11-26 (see plan-compressed.md).
 
@@ -75,3 +75,4 @@
 - 2026-11-26: Added GET /slow (5 s, async, non-blocking). Found keep-alive gap: exit 3 s after last response; fixed with closeIdleConnections() every 250 ms during shutdown → exit right after response (5.2 s).
 - 2026-11-26: User saw 'Empty reply' on /slow + Ctrl+C under npm run dev. Cause: tsx watch force-kills the child on Ctrl+C ('Previous process hasn't exited yet. Force killing...'). Code is fine: npm start, node dist/server.js, tsx (no watch) all return 200 then exit 0. Test shutdown with build + start.
 - 2026-11-26: /boom + /slow only when NODE_ENV !== production (tests/production.test.ts guards it; mutant 'prod' caught; built app with NODE_ENV=production → 404). server.ts: unhandledRejection + uncaughtException → logger.fatal({ err }) + exit(1), both verified (level 60, stack, exit 1). 13 tests pass.
+- 2026-11-26: Repository refactor: ProductRepository interface (async), InMemoryProductRepository (copies in/out), createApp({ productRepo }), createProductsRouter(repo) with await, server.ts = composition root with Keyboard/Mouse seed, tests beforeEach fresh repo+app, repo unit tests, products.store.ts deleted. 18 tests pass; mutant 'findAll returns real array' caught.

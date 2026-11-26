@@ -1,11 +1,33 @@
-// We import the app, NOT the server: no listen(), no port.
+// We create the app, NOT the server: no listen(), no port.
 // supertest gives the app a fake request and reads the response in memory.
 // This is why app.ts and server.ts are separate files.
+import type { Express } from "express";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
-import { app } from "../src/app.js";
+import { beforeEach, describe, expect, it } from "vitest";
+import { createApp } from "../src/app.js";
+import { InMemoryProductRepository } from "../src/data/inMemory.product.repository.js";
 
 const PROBLEM_JSON = /application\/problem\+json/;
+
+// A brand-new repository and app for EVERY test. A product created in one test
+// can never leak into another, so tests pass in any order.
+let app: Express;
+beforeEach(() => {
+  app = createApp({
+    productRepo: new InMemoryProductRepository([
+      { id: "1", name: "Keyboard", price: 1290 },
+      { id: "2", name: "Mouse", price: 590 },
+    ]),
+  });
+});
+
+describe("GET /products", () => {
+  it("lists the seed products", async () => {
+    const res = await request(app).get("/products");
+    expect(res.status).toBe(200);
+    expect(res.body.map((p: { name: string }) => p.name)).toEqual(["Keyboard", "Mouse"]);
+  });
+});
 
 describe("GET /health", () => {
   it("returns 200 ok", async () => {
@@ -44,6 +66,11 @@ describe("POST /products", () => {
     expect(res.body).toMatchObject({ name: "Monitor", price: 5990 });
     expect(typeof res.body.id).toBe("string");
     expect(res.body.id.length).toBeGreaterThan(0);
+
+    // Round trip: the new product can be read back by its id.
+    const read = await request(app).get(`/products/${res.body.id}`);
+    expect(read.status).toBe(200);
+    expect(read.body).toEqual(res.body);
   });
 
   it("returns 400 problem+json with issues for a bad body", async () => {

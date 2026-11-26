@@ -1,66 +1,75 @@
-// app.ts: create and export the Express app and wire the parts together.
-// Do NOT call listen() in this file, so tests can import the app
+// app.ts: build the Express app and wire the parts together.
+// Do NOT call listen() in this file, so tests can create an app
 // and send requests to it with supertest without starting a real server.
 //
-// Done: request logging with pino-http + request id, routes, validation with zod,
-// 404 handler, central error handler.
+// createApp() takes its dependencies as a parameter ("dependency injection"):
+// server.ts passes the real ones, tests pass fresh ones for every test.
 import { randomUUID } from "node:crypto";
-import express from "express";
+import express, { type Express } from "express";
 import { pinoHttp } from "pino-http";
+import type { ProductRepository } from "./data/product.repository.js";
 import { logger } from "./logger.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { notFound } from "./middleware/notFound.js";
 import { healthRouter } from "./routes/health.routes.js";
-import { productsRouter } from "./routes/products.routes.js";
+import { createProductsRouter } from "./routes/products.routes.js";
 
-export const app = express();
+export type AppDeps = {
+  productRepo: ProductRepository;
+};
 
-// Request logging FIRST, so every request gets a request id and a log line,
-// even one that fails in express.json() below.
-app.use(
-  pinoHttp({
-    logger,
-    // Never write secrets to logs: these header values show as "[Redacted]".
-    redact: ["req.headers.authorization", "req.headers.cookie"],
-    // Use the caller's x-request-id if it sent one (so one id follows the request
-    // across services), otherwise make a new one. Send it back to the client too.
-    genReqId: (req, res) => {
-      const fromClient = req.headers["x-request-id"];
-      const id =
-        typeof fromClient === "string" && fromClient.length > 0 && fromClient.length <= 128
-          ? fromClient
-          : randomUUID();
-      res.setHeader("x-request-id", id);
-      return id;
-    },
-  }),
-);
+export function createApp(deps: AppDeps): Express {
+  const app = express();
 
-// Middleware: parse a JSON request body into req.body.
-app.use(express.json());
+  // Request logging FIRST, so every request gets a request id and a log line,
+  // even one that fails in express.json() below.
+  app.use(
+    pinoHttp({
+      logger,
+      // Never write secrets to logs: these header values show as "[Redacted]".
+      redact: ["req.headers.authorization", "req.headers.cookie"],
+      // Use the caller's x-request-id if it sent one (so one id follows the request
+      // across services), otherwise make a new one. Send it back to the client too.
+      genReqId: (req, res) => {
+        const fromClient = req.headers["x-request-id"];
+        const id =
+          typeof fromClient === "string" && fromClient.length > 0 && fromClient.length <= 128
+            ? fromClient
+            : randomUUID();
+        res.setHeader("x-request-id", id);
+        return id;
+      },
+    }),
+  );
 
-// Routers: each one handles one group of URLs.
-app.use("/health", healthRouter);
-app.use("/products", productsRouter);
+  // Middleware: parse a JSON request body into req.body.
+  app.use(express.json());
 
-// Test-only routes. Never in production: /slow would let anyone hold
-// connections open for 5 s each, and /boom fills the error logs on purpose.
-// NODE_ENV is read when this file is first imported (once per process).
-if (process.env.NODE_ENV !== "production") {
-  // Throws on purpose so we can see the error handler work.
-  app.get("/boom", () => {
-    throw new Error("boom");
-  });
+  // Routers: each one handles one group of URLs.
+  app.use("/health", healthRouter);
+  app.use("/products", createProductsRouter(deps.productRepo));
 
-  // Answers after 5 s, so we can send SIGTERM while it is in flight
-  // and see graceful shutdown wait for it. It does NOT block the event loop:
-  // the await gives the thread back, so other requests still run meanwhile.
-  app.get("/slow", async (_req, res) => {
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-    res.json({ done: true });
-  });
+  // Test-only routes. Never in production: /slow would let anyone hold
+  // connections open for 5 s each, and /boom fills the error logs on purpose.
+  // NODE_ENV is read each time createApp() runs.
+  if (process.env.NODE_ENV !== "production") {
+    // Throws on purpose so we can see the error handler work.
+    app.get("/boom", () => {
+      throw new Error("boom");
+    });
+
+    // Answers after 5 s, so we can send SIGTERM while it is in flight
+    // and see graceful shutdown wait for it. It does NOT block the event loop:
+    // the await gives the thread back, so other requests still run meanwhile.
+    app.get("/slow", async (_req, res) => {
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      res.json({ done: true });
+    });
+  }
+
+  // ---- These two must stay AFTER all routers, in this order. ----
+  app.use(notFound); // no route matched → 404
+  app.use(errorHandler); // something threw → 500 (or the error's own 4xx)
+
+  return app;
 }
-
-// ---- These two must stay AFTER all routers, in this order. ----
-app.use(notFound); // no route matched → 404
-app.use(errorHandler); // something threw → 500 (or the error's own 4xx)

@@ -1,6 +1,7 @@
 // server.ts: the entry point that starts the real server.
 // app.ts builds the app; this file opens the port and handles shutdown.
-import { app } from "./app.js"; // ".js" even though the file is app.ts (NodeNext rule)
+import { createApp } from "./app.js"; // ".js" even though the file is app.ts (NodeNext rule)
+import { InMemoryProductRepository } from "./data/inMemory.product.repository.js";
 import { logger } from "./logger.js";
 
 // Last line of defense: an error that NO code caught.
@@ -27,6 +28,15 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) {
   logger.fatal({ PORT: process.env.PORT }, "PORT must be a whole number from 0 to 65535");
   process.exit(1);
 }
+
+// This is the ONE place that picks the real dependencies ("composition root").
+// Day 2: swap in a DynamoDB repository here; nothing else changes.
+const app = createApp({
+  productRepo: new InMemoryProductRepository([
+    { id: "1", name: "Keyboard", price: 1290 },
+    { id: "2", name: "Mouse", price: 590 },
+  ]),
+});
 
 // Express 5 passes listen errors (e.g. EADDRINUSE: port already in use) to this callback.
 const server = app.listen(port, (err?: Error) => {
