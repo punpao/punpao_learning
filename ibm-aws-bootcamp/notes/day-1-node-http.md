@@ -194,3 +194,10 @@ function greet() { console.log("hi"); return Promise.resolve(undefined); }
 - Break-it 1: changing `.min(0)` to `.min(-100)` left all 9 tests green, because no test sent a negative price. Lesson: green tests do not mean correct code; a test only catches what it checks.
 - Boundary testing: for a rule like `price >= 0`, test the values right at the edge: -1 → 400 and 0 → 201. Bugs often hide at edges (`>` vs `>=`).
 - Break-it 2: with the two boundary tests added, the same change turned 1 test red (expected 400, received 201). Deliberately breaking code to check the tests catch it is the idea behind mutation testing.
+
+### Task 6: graceful shutdown (2026-11-26)
+- On a deploy or scale-in, ECS (and `docker stop`) sends SIGTERM, waits, then sends SIGKILL. Closing at once cuts requests that are still running, so users see errors.
+- Graceful shutdown: on SIGTERM/SIGINT, `server.close()` stops new connections and lets in-flight requests finish, then `process.exit(0)`. A 10 s safety timer (`.unref()`) forces exit if a request hangs.
+- Test: `curl /slow` (5 s), press Ctrl+C during it. With `npx tsx src/server.ts` the client still got `{"done":true}`. With `npm run dev` it got "Empty reply": the `tsx watch` wrapper kills the server itself, before our shutdown code can wait.
+- Lesson: the signal must reach our process directly. In Docker, start with `node dist/server.js`, not `npm start`, so SIGTERM is not lost in a wrapper.
+- Commands: `npm run dev` = run with auto-restart on save (dev); `npx tsx src/server.ts` = run without auto-restart; `npm run build` + `npm start` = compile to dist/ then run with node (production).

@@ -1,10 +1,59 @@
 // server.ts: the entry point that starts the real server.
-//
-// Still to write: listen on process.env.PORT (with a default),
-// and handle SIGTERM for graceful shutdown (stop accepting new connections,
-// let in-flight requests finish, then exit).
+// app.ts builds the app; this file opens the port and handles shutdown.
 import { app } from "./app.js"; // ".js" even though the file is app.ts (NodeNext rule)
+import { logger } from "./logger.js";
 
-app.listen(3000, () => {
-  console.log("catalog-service listening on http://localhost:3000");
+// PORT comes from the environment (ECS, Docker, etc. set it). Default 3000 for local dev.
+// Fail fast on a bad value instead of quietly using a different port.
+const port = Number(process.env.PORT ?? 3000);
+if (!Number.isInteger(port) || port < 0 || port > 65535) {
+  logger.fatal({ PORT: process.env.PORT }, "PORT must be a whole number from 0 to 65535");
+  process.exit(1);
+}
+
+// Express 5 passes listen errors (e.g. EADDRINUSE: port already in use) to this callback.
+const server = app.listen(port, (err?: Error) => {
+  if (err) {
+    logger.fatal({ err }, "could not start server");
+    process.exit(1);
+  }
+  logger.info({ port }, "catalog-service listening");
 });
+
+// Graceful shutdown. ECS (and docker stop) sends SIGTERM, waits, then sends SIGKILL.
+// 1. server.close(): stop accepting NEW connections. Idle keep-alive connections
+//    are closed too (Node 19+). Requests already in flight are allowed to finish.
+// 2. When the last one finishes, the close callback runs → exit 0.
+// 3. Safety timer: if a request hangs, exit anyway before SIGKILL arrives.
+const SHUTDOWN_TIMEOUT_MS = 10_000;
+let shuttingDown = false;
+
+function shutdown(signal: NodeJS.Signals): void {
+  if (shuttingDown) return; // a second signal must not start a second shutdown
+  shuttingDown = true;
+  logger.info({ signal }, "shutting down: no new connections, finishing in-flight requests");
+
+  server.close((err) => {
+    if (err) {
+      logger.error({ err }, "error while closing server");
+      process.exit(1);
+    }
+    logger.info("all requests finished, bye");
+    process.exit(0);
+  });
+
+  // server.close() closes idle keep-alive connections only at the moment it is called.
+  // A connection whose request finishes LATER (e.g. /slow) stays open but idle until
+  // its keep-alive timeout, and that delays the exit by seconds. Close those as soon
+  // as they become idle.
+  setInterval(() => server.closeIdleConnections(), 250).unref();
+
+  // .unref(): this timer alone must not keep the process alive.
+  setTimeout(() => {
+    logger.error({ timeoutMs: SHUTDOWN_TIMEOUT_MS }, "shutdown timed out, forcing exit");
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS).unref();
+}
+
+process.on("SIGTERM", shutdown); // ECS / docker stop / kill
+process.on("SIGINT", shutdown); // Ctrl+C in the terminal

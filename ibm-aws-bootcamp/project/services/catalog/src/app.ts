@@ -48,6 +48,14 @@ app.get("/boom", () => {
   throw new Error("boom");
 });
 
+// Test route: answers after 5 s, so we can send SIGTERM while it is in flight
+// and see graceful shutdown wait for it. It does NOT block the event loop:
+// the await gives the thread back, so other requests still run meanwhile.
+app.get("/slow", async (_req, res) => {
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+  res.json({ done: true });
+});
+
 // ---- These two must stay AFTER all routers, in this order. ----
 app.use(notFound); // no route matched → 404
 app.use(errorHandler); // something threw → 500 (or the error's own 4xx)
