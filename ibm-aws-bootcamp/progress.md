@@ -16,7 +16,7 @@
 ## Status
 - **Current day:** 1 (planned 2026-11-24, started early 2026-11-23 23:22)
 - **Current block:** 1.2 done → next 1.3 HTTP + Express
-- **Current step:** Day 1 build Tasks 1–6 done. Next: code review (project/reviews/day-1.md), then Day 1 system design block (URL shortener) and review block.
+- **Current step:** Day 1 build Tasks 1–6 done. Code review in project/reviews/day-1.md (2 red items: test routes in prod, no crash handlers). Next: review explain-back, then Day 1 system design (URL shortener) and review block.
 - **Pace:** on track
 
 ## Days
