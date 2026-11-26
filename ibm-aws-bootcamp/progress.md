@@ -16,7 +16,7 @@
 ## Status
 - **Current day:** 1 (planned 2026-11-24, started early 2026-11-23 23:22)
 - **Current block:** 1.2 done → next 1.3 HTTP + Express
-- **Current step:** Task 5 given: tests with vitest + supertest (light version), then break-it.
+- **Current step:** Task 5 done (11 tests pass, boundary tests added, break-it went red). Next: Task 6, graceful shutdown (SIGTERM) + code review.
 - **Pace:** on track
 
 ## Days
@@ -67,3 +67,7 @@
 - 2026-11-26: products.routes 404 + zod 400 switched to sendProblem (issues kept as extension field). All errors now problem+json.
 - 2026-11-26: Task 4 done: pino logger (LOG_LEVEL, default info), pino-http first middleware with genReqId (client x-request-id ≤128 chars or randomUUID, echoed in response), errorHandler uses req.log.error({ err }). Checked headers + JSON log lines.
 - 2026-11-26: Task 4b done: pinoHttp redact for req.headers.authorization + req.headers.cookie → "[Redacted]". Checked: 0 secrets in log, all 3 line types redacted.
+- 2026-11-26: Task 5 done: vitest + supertest, 9 tests (health, product 200/404, POST 201/400 issues, /nope 404, /boom 500 no stack, x-request-id echo + generated). npm test green, no log noise.
+- 2026-11-26: server.ts done. Tested: in-flight POST finished with 201 after SIGTERM, new connection ECONNREFUSED, exit 0; PORT=abc → fatal + exit 1; port in use → fatal EADDRINUSE. 9 tests still green.
+- 2026-11-26: User ran a mutation test (min(0) → min(-100)): all tests stayed green, so the price rule was unguarded. Added boundary tests (-1 → 400, 0 → 201); they catch min(-100) and .positive(). Schema restored to min(0). Lesson: green tests ≠ correct code.
+- 2026-11-26: server.ts: PORT from env (validated, default 3000, exit 1 if bad), listen errors (EADDRINUSE) → fatal + exit 1, SIGTERM/SIGINT → server.close(), in-flight finish, 10s forced-exit timer. Verified: in-flight POST got 201 after SIGTERM, new connection refused, exit 0.

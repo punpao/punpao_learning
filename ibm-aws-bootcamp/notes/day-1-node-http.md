@@ -188,3 +188,9 @@ function greet() { console.log("hi"); return Promise.resolve(undefined); }
 - Logs go to stdout (the terminal). On AWS Lambda/ECS, stdout goes to CloudWatch Logs automatically. For readable logs in dev: `npm run dev | npx pino-pretty`.
 - Never log secrets (tokens, cookies, passwords): anyone who reads the log could act as that user. pino's `redact` option replaces them with "[Redacted]".
 - Levels: 30 = info, 50 = error. A 5xx response gets an extra "request errored" line from pino-http.
+
+### Task 5: tests with vitest + supertest (2026-11-26)
+- supertest sends requests straight to the exported `app` without `listen()`, so tests need no running server and no port. This is the payoff of splitting app.ts and server.ts in Task 1.
+- Break-it 1: changing `.min(0)` to `.min(-100)` left all 9 tests green, because no test sent a negative price. Lesson: green tests do not mean correct code; a test only catches what it checks.
+- Boundary testing: for a rule like `price >= 0`, test the values right at the edge: -1 → 400 and 0 → 201. Bugs often hide at edges (`>` vs `>=`).
+- Break-it 2: with the two boundary tests added, the same change turned 1 test red (expected 400, received 201). Deliberately breaking code to check the tests catch it is the idea behind mutation testing.
