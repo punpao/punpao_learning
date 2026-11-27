@@ -35,4 +35,18 @@ describe("InMemoryProductRepository", () => {
     expect(a.id).not.toBe(b.id);
     expect(await repo.findAll()).toHaveLength(2);
   });
+
+  it("setImageKey updates an existing product and returns a copy", async () => {
+    const repo = new InMemoryProductRepository(seed());
+    const updated = await repo.setImageKey("1", "products/1/a.png");
+    expect(updated).toEqual({ id: "1", name: "Keyboard", price: 1290, imageKey: "products/1/a.png" });
+    updated!.imageKey = "changed";
+    expect((await repo.findById("1"))!.imageKey).toBe("products/1/a.png");
+  });
+
+  it("setImageKey on a missing id → undefined, and creates nothing", async () => {
+    const repo = new InMemoryProductRepository(seed());
+    expect(await repo.setImageKey("999", "products/999/a.png")).toBeUndefined();
+    expect(await repo.findAll()).toEqual(seed());
+  });
 });

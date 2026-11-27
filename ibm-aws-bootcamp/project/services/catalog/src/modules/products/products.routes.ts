@@ -3,15 +3,26 @@
 // or care whether products live in memory or in DynamoDB.
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
-import type { ProductRepository } from "./product.repository.js";
+import type { Product, ProductRepository } from "./product.repository.js";
 import { requireAuth, requireRole } from "../auth/auth.middleware.js";
 import type { AuthService } from "../auth/auth.service.js";
 import { sendProblem } from "../../shared/http/problem.js";
 import type { FileStorage } from "../../shared/storage/file.storage.js";
-import { createProductSchema, IMAGE_EXTENSIONS, imageUploadSchema } from "./products.schema.js";
+import {
+  createProductSchema,
+  IMAGE_EXTENSIONS,
+  imageUploadSchema,
+  isImageKeyFor,
+  setImageSchema,
+} from "./products.schema.js";
 
 // How long an upload URL works. Short: if it leaks, it is useless soon.
 export const UPLOAD_URL_TTL_SECONDS = 300;
+// How long an image download URL in GET responses works.
+export const DOWNLOAD_URL_TTL_SECONDS = 900;
+
+// What clients see: never the raw S3 key, only a short-lived download URL.
+export type ProductResponse = Omit<Product, "imageKey"> & { imageUrl?: string };
 
 export function createProductsRouter(
   repo: ProductRepository,
@@ -20,9 +31,19 @@ export function createProductsRouter(
 ): Router {
   const router = Router();
 
+  // Every product leaves this router through here. imageKey is always removed;
+  // imageUrl is added only when the product has an image AND storage is configured.
+  // Presigning is local crypto (no call to S3), so doing it per product is cheap.
+  async function toResponse(product: Product): Promise<ProductResponse> {
+    const { imageKey, ...rest } = product;
+    if (!imageKey || !fileStorage) return rest;
+    return { ...rest, imageUrl: await fileStorage.createDownloadUrl(imageKey, DOWNLOAD_URL_TTL_SECONDS) };
+  }
+
   // GET /products: list all products.
   router.get("/", async (_req, res) => {
-    res.json(await repo.findAll());
+    const products = await repo.findAll();
+    res.json(await Promise.all(products.map(toResponse)));
   });
 
   // GET /products/:id: one product, or 404 if it does not exist.
@@ -32,7 +53,7 @@ export function createProductsRouter(
       sendProblem(req, res, 404, `Product ${req.params.id} does not exist`);
       return; // one request gets one response
     }
-    res.json(product);
+    res.json(await toResponse(product));
   });
 
   // POST /products: create a product. Admins only (GETs above stay public).
@@ -50,7 +71,7 @@ export function createProductsRouter(
       });
       return;
     }
-    res.status(201).json(await repo.create(result.data));
+    res.status(201).json(await toResponse(await repo.create(result.data)));
   });
 
   // POST /products/:id/image-upload-url: give an admin a presigned S3 URL to upload
@@ -85,6 +106,45 @@ export function createProductsRouter(
     const uploadUrl = await fileStorage.createUploadUrl(key, contentType, UPLOAD_URL_TTL_SECONDS);
 
     res.json({ uploadUrl, key, expiresIn: UPLOAD_URL_TTL_SECONDS });
+  });
+
+  // PUT /products/:id/image: step 2 of the upload. After the browser PUT the file
+  // to S3, it tells us the key, and we attach it to the product.
+  // Order: 401 → 403 → 503 → 400 (body / key pattern) → 404 → 400 (not uploaded) → 200.
+  router.put("/:id/image", requireAuth(auth), requireRole("admin"), async (req, res) => {
+    if (!fileStorage) {
+      sendProblem(req, res, 503, "File uploads are not configured");
+      return;
+    }
+
+    const id = req.params.id as string; // see the note in image-upload-url above
+    const result = setImageSchema.safeParse(req.body);
+    // Pattern check BEFORE anything touches S3: an admin of product 1 must not be
+    // able to attach product 2's image, or any other object in the bucket.
+    if (!result.success || !isImageKeyFor(id, result.data.key)) {
+      sendProblem(req, res, 400, `key must be an image key made for product ${id}`);
+      return;
+    }
+    const { key } = result.data;
+
+    if (!(await repo.findById(id))) {
+      sendProblem(req, res, 404, `Product ${id} does not exist`);
+      return;
+    }
+
+    // The upload-url route only PROMISED a file; check the browser really uploaded it.
+    if (!(await fileStorage.exists(key))) {
+      sendProblem(req, res, 400, "Image not uploaded yet");
+      return;
+    }
+
+    // undefined = the product was deleted between findById and now.
+    const updated = await repo.setImageKey(id, key);
+    if (!updated) {
+      sendProblem(req, res, 404, `Product ${id} does not exist`);
+      return;
+    }
+    res.json(await toResponse(updated));
   });
 
   // If repo.* rejects (e.g. DynamoDB is down), Express 5 catches the rejected

@@ -1,6 +1,7 @@
 // Unit test for the S3 adapter. Presigning is pure local crypto (no network call),
 // so fake credentials are enough: this test never talks to AWS.
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { HeadObjectCommand, NotFound, S3ServiceException } from "@aws-sdk/client-s3";
 import { createUploadS3Client, S3FileStorage } from "../src/shared/storage/s3.file.storage.js";
 
 const FAKE_CREDENTIALS = { accessKeyId: "test", secretAccessKey: "test" };
@@ -45,5 +46,53 @@ describe("S3FileStorage.createUploadUrl", () => {
     const url = await presign();
     const names = [...url.searchParams.keys()].map((k) => k.toLowerCase());
     expect(names.some((k) => k.startsWith("x-amz-checksum-"))).toBe(false);
+  });
+});
+
+describe("S3FileStorage.exists", () => {
+  // Replace send() so no request leaves the machine; we choose what "S3" answers.
+  function storageWhereSend(answer: () => Promise<unknown>) {
+    const s3 = createUploadS3Client({ region: "ap-southeast-2", credentials: FAKE_CREDENTIALS });
+    const send = vi.spyOn(s3, "send").mockImplementation(answer as never);
+    return { storage: new S3FileStorage(s3, "test-bucket"), send };
+  }
+
+  it("HeadObject succeeds → true, asking for exactly this bucket and key", async () => {
+    const { storage, send } = storageWhereSend(async () => ({}));
+    expect(await storage.exists("products/1/a.png")).toBe(true);
+    const command = send.mock.calls[0]![0];
+    expect(command).toBeInstanceOf(HeadObjectCommand);
+    expect(command.input).toEqual({ Bucket: "test-bucket", Key: "products/1/a.png" });
+  });
+
+  it("S3 says NotFound (404) → false", async () => {
+    const { storage } = storageWhereSend(async () => {
+      throw new NotFound({ message: "Not Found", $metadata: { httpStatusCode: 404 } });
+    });
+    expect(await storage.exists("products/1/a.png")).toBe(false);
+  });
+
+  it("any other error (e.g. 403 AccessDenied) is NOT hidden as false: it is rethrown", async () => {
+    const denied = new S3ServiceException({
+      name: "AccessDenied",
+      $fault: "client",
+      message: "Access Denied",
+      $metadata: { httpStatusCode: 403 },
+    });
+    const { storage } = storageWhereSend(async () => {
+      throw denied;
+    });
+    await expect(storage.exists("products/1/a.png")).rejects.toBe(denied);
+  });
+});
+
+describe("S3FileStorage.createDownloadUrl", () => {
+  it("signs a GET for this key with the given lifetime", async () => {
+    const s3 = createUploadS3Client({ region: "ap-southeast-2", credentials: FAKE_CREDENTIALS });
+    const url = new URL(await new S3FileStorage(s3, "test-bucket").createDownloadUrl("products/1/a.png", 900));
+    expect(url.host).toBe("test-bucket.s3.ap-southeast-2.amazonaws.com");
+    expect(url.pathname).toBe("/products/1/a.png");
+    expect(url.searchParams.get("X-Amz-Expires")).toBe("900");
+    expect(url.searchParams.get("x-id")).toBe("GetObject");
   });
 });

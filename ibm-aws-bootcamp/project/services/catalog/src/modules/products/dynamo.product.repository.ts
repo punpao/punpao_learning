@@ -6,10 +6,12 @@
 // No credentials here. The SDK finds them by itself (default credential chain):
 // locally from `aws login`, on ECS from the task role. Never put keys in code.
 import { randomUUID } from "node:crypto";
+import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import {
   GetCommand,
   PutCommand,
   ScanCommand,
+  UpdateCommand,
   type DynamoDBDocumentClient,
 } from "@aws-sdk/lib-dynamodb";
 import type { CreateProductInput } from "./products.schema.js";
@@ -66,6 +68,28 @@ export class DynamoProductRepository implements ProductRepository {
     );
     return product;
   }
+
+  async setImageKey(id: string, key: string): Promise<Product | undefined> {
+    try {
+      const { Attributes } = await this.docClient.send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: { id },
+          UpdateExpression: "SET imageKey = :key",
+          // UpdateItem is an "upsert": on a missing id it would CREATE a new item
+          // holding only { id, imageKey }. This condition makes it refuse instead.
+          ConditionExpression: "attribute_exists(id)",
+          ExpressionAttributeValues: { ":key": key },
+          ReturnValues: "ALL_NEW", // send back the whole item after the update
+        }),
+      );
+      return Attributes ? toProduct(Attributes) : undefined;
+    } catch (err) {
+      // The condition failed = no product with this id. Anything else is a real error.
+      if (err instanceof ConditionalCheckFailedException) return undefined;
+      throw err;
+    }
+  }
 }
 
 // Build a Product from a raw item: only the fields we know, with the right types.
@@ -75,5 +99,7 @@ function toProduct(item: Record<string, unknown>): Product {
     id: String(item.id),
     name: String(item.name),
     price: Number(item.price),
+    // Only a string counts; a missing attribute stays missing (no imageKey: undefined).
+    ...(typeof item.imageKey === "string" ? { imageKey: item.imageKey } : {}),
   };
 }

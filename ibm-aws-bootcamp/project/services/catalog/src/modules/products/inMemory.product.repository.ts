@@ -31,4 +31,11 @@ export class InMemoryProductRepository implements ProductRepository {
     this.products.push(product);
     return { ...product };
   }
+
+  async setImageKey(id: string, key: string): Promise<Product | undefined> {
+    const product = this.products.find((p) => p.id === id);
+    if (!product) return undefined;
+    product.imageKey = key;
+    return { ...product };
+  }
 }

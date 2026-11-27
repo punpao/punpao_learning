@@ -21,3 +21,15 @@ export const IMAGE_EXTENSIONS = {
 export const imageUploadSchema = z.object({
   contentType: z.enum(["image/png", "image/jpeg", "image/webp"]),
 });
+
+// PUT /products/:id/image body: the key that the upload-url route gave the client.
+export const setImageSchema = z.object({ key: z.string() });
+
+// Only keys the upload-url route could have made FOR THIS PRODUCT are accepted:
+// "products/<id>/<uuid>.<png|jpg|webp>". The id is compared as plain text with
+// startsWith (never put into a RegExp), so special characters in it can't change the rule.
+const IMAGE_FILE_NAME = /^[0-9a-f-]+\.(png|jpg|webp)$/;
+export function isImageKeyFor(productId: string, key: string): boolean {
+  const prefix = `products/${productId}/`;
+  return key.startsWith(prefix) && IMAGE_FILE_NAME.test(key.slice(prefix.length));
+}

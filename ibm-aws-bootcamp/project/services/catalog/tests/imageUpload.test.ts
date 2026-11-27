@@ -1,20 +1,10 @@
 // POST /products/:id/image-upload-url with a FAKE FileStorage: no AWS in tests.
-// The fake records every call, so we can check what the route asked S3 to sign.
+// The fake (tests/fakeFileStorage.ts) records every call, so we can check what was signed.
 import type { Express } from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { FileStorage } from "../src/shared/storage/file.storage.js";
+import { FakeFileStorage } from "./fakeFileStorage.js";
 import { makeApp } from "./testApp.js";
-
-type Call = { key: string; contentType: string; expiresInSeconds: number };
-
-class FakeFileStorage implements FileStorage {
-  calls: Call[] = [];
-  async createUploadUrl(key: string, contentType: string, expiresInSeconds: number) {
-    this.calls.push({ key, contentType, expiresInSeconds });
-    return `https://fake-storage.test/${key}?signature=fake`;
-  }
-}
 
 let storage: FakeFileStorage;
 let app: Express;
@@ -44,7 +34,7 @@ describe("POST /products/:id/image-upload-url", () => {
     expect(res.body.expiresIn).toBe(300);
     expect(res.body.uploadUrl).toBe(`https://fake-storage.test/${res.body.key}?signature=fake`);
     // The storage was asked to sign exactly this key, type and lifetime.
-    expect(storage.calls).toEqual([
+    expect(storage.uploadCalls).toEqual([
       { key: res.body.key, contentType: "image/png", expiresInSeconds: 300 },
     ]);
   });
@@ -72,14 +62,14 @@ describe("POST /products/:id/image-upload-url", () => {
     const user = await tokenFor("user@example.com", "user-pass");
     const res = await askUploadUrl("1", { contentType: "image/png" }, user);
     expect(res.status).toBe(403);
-    expect(storage.calls).toHaveLength(0);
+    expect(storage.uploadCalls).toHaveLength(0);
   });
 
   it("no token → 401", async () => {
     const res = await askUploadUrl("1", { contentType: "image/png" });
     expect(res.status).toBe(401);
     expect(res.headers["www-authenticate"]).toBe("Bearer");
-    expect(storage.calls).toHaveLength(0);
+    expect(storage.uploadCalls).toHaveLength(0);
   });
 
   it.each([
@@ -91,14 +81,14 @@ describe("POST /products/:id/image-upload-url", () => {
     const res = await askUploadUrl("1", body, admin);
     expect(res.status).toBe(400);
     expect(res.headers["content-type"]).toMatch(/application\/problem\+json/);
-    expect(storage.calls).toHaveLength(0);
+    expect(storage.uploadCalls).toHaveLength(0);
   });
 
   it("unknown product → 404, and nothing is signed", async () => {
     const admin = await tokenFor("admin@example.com", "admin-pass");
     const res = await askUploadUrl("999", { contentType: "image/png" }, admin);
     expect(res.status).toBe(404);
-    expect(storage.calls).toHaveLength(0);
+    expect(storage.uploadCalls).toHaveLength(0);
   });
 
   it("no fileStorage configured → 503 problem+json", async () => {

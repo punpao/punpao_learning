@@ -6,10 +6,20 @@
 // at once: DynamoDB is a network call, so it is async, and the interface must fit both.
 import type { CreateProductInput } from "./products.schema.js";
 
-export type Product = { id: string; name: string; price: number };
+export type Product = {
+  id: string;
+  name: string;
+  price: number;
+  // S3 key of the product image, e.g. "products/1/<uuid>.png". Internal only:
+  // routes never send it to clients; they send a short-lived imageUrl instead.
+  imageKey?: string;
+};
 
 export interface ProductRepository {
   findAll(): Promise<Product[]>;
   findById(id: string): Promise<Product | undefined>;
   create(input: CreateProductInput): Promise<Product>;
+  // Saves the image key on an EXISTING product. Returns the updated product,
+  // or undefined if there is no product with this id (it never creates one).
+  setImageKey(id: string, key: string): Promise<Product | undefined>;
 }
