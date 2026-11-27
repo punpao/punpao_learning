@@ -5,9 +5,10 @@
 // createApp() takes its dependencies as a parameter ("dependency injection"):
 // server.ts passes the real ones, tests pass fresh ones for every test.
 import { randomUUID } from "node:crypto";
+import cors from "cors";
 import express, { type Express } from "express";
 import { pinoHttp } from "pino-http";
-import { createAuthRouter } from "./modules/auth/auth.routes.js";
+import { createAuthRouter, type LoginRateLimit } from "./modules/auth/auth.routes.js";
 import type { AuthService } from "./modules/auth/auth.service.js";
 import type { ProductRepository } from "./modules/products/product.repository.js";
 import { logger } from "./shared/logger.js";
@@ -19,10 +20,20 @@ import { createProductsRouter } from "./modules/products/products.routes.js";
 export type AppDeps = {
   productRepo: ProductRepository;
   authService: AuthService;
+  // Browser origins allowed to call this API (e.g. the Angular app on :4200).
+  corsOrigins: string[];
+  // Optional: tests pass a high limit (or a tiny one to test 429). Default 5 / 15 min.
+  loginRateLimit?: LoginRateLimit;
 };
 
 export function createApp(deps: AppDeps): Express {
   const app = express();
+
+  // Behind the AWS ALB, the TCP connection comes from the ALB, and the real client
+  // IP is in X-Forwarded-For. "1" = trust exactly ONE proxy hop (the ALB), so
+  // req.ip is the client, and the login rate limit counts per client, not per ALB.
+  // Without a proxy in front (e.g. local dev), a client could fake X-Forwarded-For.
+  app.set("trust proxy", 1);
 
   // Request logging FIRST, so every request gets a request id and a log line,
   // even one that fails in express.json() below.
@@ -45,12 +56,25 @@ export function createApp(deps: AppDeps): Express {
     }),
   );
 
+  // CORS: tells BROWSERS which other websites (origins) may call this API from
+  // their JavaScript. Only listed origins get Access-Control-Allow-Origin back;
+  // others get no CORS headers, so the browser blocks their page from reading the
+  // response. (CORS does not stop curl or servers: it is not authentication.)
+  // It also answers the browser's OPTIONS "preflight" before e.g. a POST with JSON.
+  app.use(
+    cors({
+      origin: deps.corsOrigins,
+      allowedHeaders: ["Content-Type", "Authorization"],
+      exposedHeaders: ["x-request-id"], // let browser JS read our request id
+    }),
+  );
+
   // Middleware: parse a JSON request body into req.body.
   app.use(express.json());
 
   // Routers: each one handles one group of URLs.
   app.use("/health", healthRouter);
-  app.use("/auth", createAuthRouter(deps.authService));
+  app.use("/auth", createAuthRouter(deps.authService, deps.loginRateLimit));
   app.use("/products", createProductsRouter(deps.productRepo, deps.authService));
 
   // Test-only routes. Never in production: /slow would let anyone hold

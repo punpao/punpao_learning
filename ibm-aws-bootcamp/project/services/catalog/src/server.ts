@@ -64,9 +64,18 @@ if (!jwtSecret || jwtSecret.length < 16) {
   process.exit(1);
 }
 
+// CORS_ORIGINS: comma-separated list, e.g. "https://shop.example.com,http://localhost:4200".
+// Must match exactly what the browser sends: scheme + host + port, no trailing slash.
+const corsOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:4200")
+  .split(",")
+  .map((o) => o.trim())
+  .filter((o) => o.length > 0);
+logger.info({ corsOrigins }, "CORS allowed origins");
+
 const app = createApp({
   productRepo: createProductRepo(),
   authService: new AuthService(new InMemoryUserRepository(), jwtSecret),
+  corsOrigins,
 });
 
 // Express 5 passes listen errors (e.g. EADDRINUSE: port already in use) to this callback.

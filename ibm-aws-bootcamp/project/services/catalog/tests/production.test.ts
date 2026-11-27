@@ -3,17 +3,11 @@
 // NODE_ENV and build a new app. (No module-cache tricks needed any more.)
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createApp } from "../src/app.js";
-import { AuthService } from "../src/modules/auth/auth.service.js";
-import { InMemoryUserRepository } from "../src/modules/auth/inMemory.user.repository.js";
-import { InMemoryProductRepository } from "../src/modules/products/inMemory.product.repository.js";
+import { makeApp } from "./testApp.js";
 
 function appFor(nodeEnv: string) {
   vi.stubEnv("NODE_ENV", nodeEnv);
-  return createApp({
-    productRepo: new InMemoryProductRepository(),
-    authService: new AuthService(new InMemoryUserRepository(), "test-secret-1234567890"),
-  });
+  return makeApp();
 }
 
 afterEach(() => {

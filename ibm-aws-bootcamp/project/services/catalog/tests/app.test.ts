@@ -4,10 +4,9 @@
 import type { Express } from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createApp } from "../src/app.js";
 import { AuthService } from "../src/modules/auth/auth.service.js";
 import { InMemoryUserRepository } from "../src/modules/auth/inMemory.user.repository.js";
-import { InMemoryProductRepository } from "../src/modules/products/inMemory.product.repository.js";
+import { makeApp } from "./testApp.js";
 
 const PROBLEM_JSON = /application\/problem\+json/;
 
@@ -15,13 +14,7 @@ const PROBLEM_JSON = /application\/problem\+json/;
 // can never leak into another, so tests pass in any order.
 let app: Express;
 beforeEach(() => {
-  app = createApp({
-    productRepo: new InMemoryProductRepository([
-      { id: "1", name: "Keyboard", price: 1290 },
-      { id: "2", name: "Mouse", price: 590 },
-    ]),
-    authService: new AuthService(new InMemoryUserRepository(), "test-secret-1234567890"),
-  });
+  app = makeApp();
 });
 
 describe("GET /products", () => {
