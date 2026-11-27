@@ -54,6 +54,7 @@
 | Budget `bootcamp-monthly` | (console) | 2026-11-23 | free | ✅ active |
 | CDKToolkit (S3 staging bucket, ECR repo, 5 IAM roles, SSM param) | CDKToolkit | 2026-11-23 | ~$0 (cents/month) | ✅ keep until Day 7 |
 | DynamoDB table catalog-products-dev (on-demand, key id; created by owner in Console) | (no stack) | 2026-11-26 | ~$0 | ✅ delete at Day D teardown |
+| S3 bucket catalog-images-dev-punpao (private, Block Public Access on; created by owner) + 1 test image (70 B) | (no stack) | 2026-11-27 | ~$0 | ✅ empty + delete at Day D teardown |
 
 ## Session log
 - 2026-11-23: Day 0. Checked AWS identity, sign-in method and IAM (0 users, admin role via `aws login`). Found budget and free plan already set up. All tools installed. Created folder and progress file.
