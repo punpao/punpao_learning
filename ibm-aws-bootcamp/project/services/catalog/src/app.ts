@@ -51,7 +51,7 @@ export function createApp(deps: AppDeps): Express {
   // Routers: each one handles one group of URLs.
   app.use("/health", healthRouter);
   app.use("/auth", createAuthRouter(deps.authService));
-  app.use("/products", createProductsRouter(deps.productRepo));
+  app.use("/products", createProductsRouter(deps.productRepo, deps.authService));
 
   // Test-only routes. Never in production: /slow would let anyone hold
   // connections open for 5 s each, and /boom fills the error logs on purpose.

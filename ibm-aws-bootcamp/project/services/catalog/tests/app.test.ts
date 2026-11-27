@@ -61,9 +61,62 @@ describe("GET /products/:id", () => {
 });
 
 describe("POST /products", () => {
+  // POST needs a token: log in as the demo admin before each test.
+  let adminToken: string;
+  beforeEach(async () => {
+    const login = await request(app)
+      .post("/auth/login")
+      .send({ email: "admin@example.com", password: "admin-pass" });
+    expect(login.status).toBe(200);
+    adminToken = login.body.accessToken;
+  });
+
+  // Without these, deleting requireAuth from the route would leave every test green.
+  it("returns 401 without a token", async () => {
+    const res = await request(app)
+      .post("/products")
+      .send({ name: "Monitor", price: 5990 });
+    expect(res.status).toBe(401);
+    expect(res.headers["content-type"]).toMatch(PROBLEM_JSON);
+    expect(res.headers["www-authenticate"]).toBe("Bearer");
+    expect((await request(app).get("/products")).body).toHaveLength(2); // nothing created
+  });
+
+  it("returns 401 for a token signed with a different secret (forged)", async () => {
+    const forged = await new AuthService(new InMemoryUserRepository(), "attacker-secret-123456")
+      .login("admin@example.com", "admin-pass");
+    const res = await request(app)
+      .post("/products")
+      .set("Authorization", `Bearer ${forged!.accessToken}`)
+      .send({ name: "Monitor", price: 5990 });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 (not 400) for a bad body without a token: auth is checked first", async () => {
+    const res = await request(app).post("/products").send({ name: "Pen", price: "free" });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 for a logged-in user who is not admin", async () => {
+    const login = await request(app)
+      .post("/auth/login")
+      .send({ email: "user@example.com", password: "user-pass" });
+    expect(login.status).toBe(200);
+
+    const res = await request(app)
+      .post("/products")
+      .set("Authorization", `Bearer ${login.body.accessToken}`)
+      .send({ name: "Monitor", price: 5990 });
+    expect(res.status).toBe(403);
+    expect(res.headers["content-type"]).toMatch(PROBLEM_JSON);
+    expect(res.body.detail).toBe("You do not have permission to perform this action");
+    expect((await request(app).get("/products")).body).toHaveLength(2); // nothing created
+  });
+
   it("creates a product with a server-made id (201)", async () => {
     const res = await request(app)
       .post("/products")
+      .set("Authorization", `Bearer ${adminToken}`)
       .send({ name: "Monitor", price: 5990 });
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({ name: "Monitor", price: 5990 });
@@ -79,6 +132,7 @@ describe("POST /products", () => {
   it("returns 400 problem+json with issues for a bad body", async () => {
     const res = await request(app)
       .post("/products")
+      .set("Authorization", `Bearer ${adminToken}`)
       .send({ name: "Pen", price: "free" });
     expect(res.status).toBe(400);
     expect(res.headers["content-type"]).toMatch(PROBLEM_JSON);
@@ -93,6 +147,7 @@ describe("POST /products", () => {
   it("rejects a negative price (400, issue on price)", async () => {
     const res = await request(app)
       .post("/products")
+      .set("Authorization", `Bearer ${adminToken}`)
       .send({ name: "Broken", price: -1 });
     expect(res.status).toBe(400);
     expect(res.body.issues).toEqual([
@@ -103,6 +158,7 @@ describe("POST /products", () => {
   it("accepts price 0 (the lowest allowed value)", async () => {
     const res = await request(app)
       .post("/products")
+      .set("Authorization", `Bearer ${adminToken}`)
       .send({ name: "Free sticker", price: 0 });
     expect(res.status).toBe(201);
     expect(res.body.price).toBe(0);

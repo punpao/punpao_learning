@@ -25,4 +25,24 @@ export class AuthService {
     return { accessToken, tokenType: "Bearer" as const, expiresIn: TOKEN_TTL_SECONDS };
   }
 
+  // Check a token: right signature, not expired, signed with HS256 only.
+  // Pinning algorithms stops "alg confusion" attacks (e.g. a token with alg "none").
+  // Any problem (bad signature, expired, malformed, wrong shape) → null.
+  verify(token: string): { id: string; role: Role } | null {
+    try {
+      const payload = jwt.verify(token, this.jwtSecret, { algorithms: ["HS256"] });
+      // A valid signature only proves WE signed it; still check the shape we expect.
+      if (
+        typeof payload !== "object" ||
+        typeof payload.sub !== "string" ||
+        (payload.role !== "admin" && payload.role !== "user")
+      ) {
+        return null;
+      }
+      return { id: payload.sub, role: payload.role };
+    } catch {
+      return null;
+    }
+  }
+
 }

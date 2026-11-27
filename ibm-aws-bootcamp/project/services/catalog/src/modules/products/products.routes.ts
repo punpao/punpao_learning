@@ -3,10 +3,12 @@
 // or care whether products live in memory or in DynamoDB.
 import { Router } from "express";
 import type { ProductRepository } from "./product.repository.js";
+import { requireAuth, requireRole } from "../auth/auth.middleware.js";
+import type { AuthService } from "../auth/auth.service.js";
 import { sendProblem } from "../../shared/http/problem.js";
 import { createProductSchema } from "./products.schema.js";
 
-export function createProductsRouter(repo: ProductRepository): Router {
+export function createProductsRouter(repo: ProductRepository, auth: AuthService): Router {
   const router = Router();
 
   // GET /products: list all products.
@@ -24,8 +26,10 @@ export function createProductsRouter(repo: ProductRepository): Router {
     res.json(product);
   });
 
-  // POST /products: create a product.
-  router.post("/", async (req, res) => {
+  // POST /products: create a product. Admins only (GETs above stay public).
+  // Order matters: requireAuth (no/invalid token → 401) sets res.locals.user,
+  // then requireRole (not admin → 403), and only then do we look at the body.
+  router.post("/", requireAuth(auth), requireRole("admin"), async (req, res) => {
     const result = createProductSchema.safeParse(req.body);
     if (!result.success) {
       sendProblem(req, res, 400, "The request body is not valid", {
