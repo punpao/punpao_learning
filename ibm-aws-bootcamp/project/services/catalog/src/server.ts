@@ -9,6 +9,8 @@ import { DynamoProductRepository } from "./modules/products/dynamo.product.repos
 import { InMemoryProductRepository } from "./modules/products/inMemory.product.repository.js";
 import type { ProductRepository } from "./modules/products/product.repository.js";
 import { logger } from "./shared/logger.js";
+import type { FileStorage } from "./shared/storage/file.storage.js";
+import { createUploadS3Client, S3FileStorage } from "./shared/storage/s3.file.storage.js";
 
 // Last line of defense: an error that NO code caught.
 // - unhandledRejection: a promise rejected and nobody had .catch() or try/await.
@@ -54,6 +56,22 @@ function createProductRepo(): ProductRepository {
   ]);
 }
 
+// UPLOAD_BUCKET set → product image uploads go to that S3 bucket (presigned PUT URLs).
+// Not set → no file storage; the upload route answers 503. The bucket name comes
+// only from the environment, like everything account-specific.
+function createFileStorage(): FileStorage | undefined {
+  const bucket = process.env.UPLOAD_BUCKET;
+  if (!bucket) {
+    logger.info("UPLOAD_BUCKET not set: image uploads disabled");
+    return undefined;
+  }
+  const region = process.env.AWS_REGION ?? "ap-southeast-2";
+  // No credentials passed (default chain, like DynamoDB above).
+  const s3 = createUploadS3Client({ region });
+  logger.info({ region, bucket }, "image uploads go to S3");
+  return new S3FileStorage(s3, bucket);
+}
+
 // JWT_SECRET signs the login tokens. It comes ONLY from the environment
 // (locally: .env / your shell; on AWS: Secrets Manager). Never hardcode it here:
 // the repo is public, and anyone with the secret can make valid admin tokens.
@@ -76,6 +94,7 @@ const app = createApp({
   productRepo: createProductRepo(),
   authService: new AuthService(new InMemoryUserRepository(), jwtSecret),
   corsOrigins,
+  fileStorage: createFileStorage(),
 });
 
 // Express 5 passes listen errors (e.g. EADDRINUSE: port already in use) to this callback.

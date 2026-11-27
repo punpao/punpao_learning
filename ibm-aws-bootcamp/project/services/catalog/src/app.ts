@@ -12,6 +12,7 @@ import { createAuthRouter, type LoginRateLimit } from "./modules/auth/auth.route
 import type { AuthService } from "./modules/auth/auth.service.js";
 import type { ProductRepository } from "./modules/products/product.repository.js";
 import { logger } from "./shared/logger.js";
+import type { FileStorage } from "./shared/storage/file.storage.js";
 import { errorHandler } from "./shared/middleware/errorHandler.js";
 import { notFound } from "./shared/middleware/notFound.js";
 import { healthRouter } from "./modules/health/health.routes.js";
@@ -24,6 +25,9 @@ export type AppDeps = {
   corsOrigins: string[];
   // Optional: tests pass a high limit (or a tiny one to test 429). Default 5 / 15 min.
   loginRateLimit?: LoginRateLimit;
+  // Optional: S3 in production (server.ts, when UPLOAD_BUCKET is set), a fake in tests.
+  // Missing → POST /products/:id/image-upload-url answers 503.
+  fileStorage?: FileStorage;
 };
 
 export function createApp(deps: AppDeps): Express {
@@ -75,7 +79,7 @@ export function createApp(deps: AppDeps): Express {
   // Routers: each one handles one group of URLs.
   app.use("/health", healthRouter);
   app.use("/auth", createAuthRouter(deps.authService, deps.loginRateLimit));
-  app.use("/products", createProductsRouter(deps.productRepo, deps.authService));
+  app.use("/products", createProductsRouter(deps.productRepo, deps.authService, deps.fileStorage));
 
   // Test-only routes. Never in production: /slow would let anyone hold
   // connections open for 5 s each, and /boom fills the error logs on purpose.

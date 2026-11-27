@@ -9,3 +9,15 @@ export const createProductSchema = z.object({
 });
 
 export type CreateProductInput = z.infer<typeof createProductSchema>;
+
+// Image upload: only these types. The server picks the file extension from this,
+// so a client cannot choose ".html" or a path like "../../x".
+export const IMAGE_EXTENSIONS = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+} as const;
+
+export const imageUploadSchema = z.object({
+  contentType: z.enum(["image/png", "image/jpeg", "image/webp"]),
+});
