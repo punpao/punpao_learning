@@ -1,7 +1,7 @@
 // ProductRepository backed by a plain array. Used for local dev and tests.
 // Data lives only as long as this object: a new instance starts fresh.
 import { randomUUID } from "node:crypto";
-import type { CreateProductInput } from "../schemas/product.schema.js";
+import type { CreateProductInput } from "./products.schema.js";
 import type { Product, ProductRepository } from "./product.repository.js";
 
 export class InMemoryProductRepository implements ProductRepository {

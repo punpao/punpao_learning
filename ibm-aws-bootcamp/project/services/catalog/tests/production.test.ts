@@ -4,11 +4,16 @@
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
-import { InMemoryProductRepository } from "../src/data/inMemory.product.repository.js";
+import { AuthService } from "../src/modules/auth/auth.service.js";
+import { InMemoryUserRepository } from "../src/modules/auth/inMemory.user.repository.js";
+import { InMemoryProductRepository } from "../src/modules/products/inMemory.product.repository.js";
 
 function appFor(nodeEnv: string) {
   vi.stubEnv("NODE_ENV", nodeEnv);
-  return createApp({ productRepo: new InMemoryProductRepository() });
+  return createApp({
+    productRepo: new InMemoryProductRepository(),
+    authService: new AuthService(new InMemoryUserRepository(), "test-secret-1234567890"),
+  });
 }
 
 afterEach(() => {

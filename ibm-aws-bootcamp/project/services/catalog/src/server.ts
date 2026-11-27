@@ -3,10 +3,12 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { createApp } from "./app.js"; // ".js" even though the file is app.ts (NodeNext rule)
-import { DynamoProductRepository } from "./data/dynamo.product.repository.js";
-import { InMemoryProductRepository } from "./data/inMemory.product.repository.js";
-import type { ProductRepository } from "./data/product.repository.js";
-import { logger } from "./logger.js";
+import { AuthService } from "./modules/auth/auth.service.js";
+import { InMemoryUserRepository } from "./modules/auth/inMemory.user.repository.js";
+import { DynamoProductRepository } from "./modules/products/dynamo.product.repository.js";
+import { InMemoryProductRepository } from "./modules/products/inMemory.product.repository.js";
+import type { ProductRepository } from "./modules/products/product.repository.js";
+import { logger } from "./shared/logger.js";
 
 // Last line of defense: an error that NO code caught.
 // - unhandledRejection: a promise rejected and nobody had .catch() or try/await.
@@ -52,7 +54,20 @@ function createProductRepo(): ProductRepository {
   ]);
 }
 
-const app = createApp({ productRepo: createProductRepo() });
+// JWT_SECRET signs the login tokens. It comes ONLY from the environment
+// (locally: .env / your shell; on AWS: Secrets Manager). Never hardcode it here:
+// the repo is public, and anyone with the secret can make valid admin tokens.
+// HS256 needs a long random secret; 16 chars is our minimum, 32+ random bytes is better.
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret || jwtSecret.length < 16) {
+  logger.fatal("JWT_SECRET is missing or shorter than 16 characters");
+  process.exit(1);
+}
+
+const app = createApp({
+  productRepo: createProductRepo(),
+  authService: new AuthService(new InMemoryUserRepository(), jwtSecret),
+});
 
 // Express 5 passes listen errors (e.g. EADDRINUSE: port already in use) to this callback.
 const server = app.listen(port, (err?: Error) => {

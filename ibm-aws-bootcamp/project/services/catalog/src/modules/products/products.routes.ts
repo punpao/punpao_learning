@@ -2,9 +2,9 @@
 // The repository is passed in ("dependency injection"), so this file does not know
 // or care whether products live in memory or in DynamoDB.
 import { Router } from "express";
-import type { ProductRepository } from "../data/product.repository.js";
-import { sendProblem } from "../http/problem.js";
-import { createProductSchema } from "../schemas/product.schema.js";
+import type { ProductRepository } from "./product.repository.js";
+import { sendProblem } from "../../shared/http/problem.js";
+import { createProductSchema } from "./products.schema.js";
 
 export function createProductsRouter(repo: ProductRepository): Router {
   const router = Router();

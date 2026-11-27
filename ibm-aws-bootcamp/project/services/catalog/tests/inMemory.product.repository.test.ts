@@ -1,7 +1,7 @@
 // Unit tests for the repository alone: no Express, no HTTP.
 // They guard the "return copies, not our own data" rule.
 import { describe, expect, it } from "vitest";
-import { InMemoryProductRepository } from "../src/data/inMemory.product.repository.js";
+import { InMemoryProductRepository } from "../src/modules/products/inMemory.product.repository.js";
 
 const seed = () => [{ id: "1", name: "Keyboard", price: 1290 }];
 

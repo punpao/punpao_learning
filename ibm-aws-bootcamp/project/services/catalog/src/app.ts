@@ -7,15 +7,18 @@
 import { randomUUID } from "node:crypto";
 import express, { type Express } from "express";
 import { pinoHttp } from "pino-http";
-import type { ProductRepository } from "./data/product.repository.js";
-import { logger } from "./logger.js";
-import { errorHandler } from "./middleware/errorHandler.js";
-import { notFound } from "./middleware/notFound.js";
-import { healthRouter } from "./routes/health.routes.js";
-import { createProductsRouter } from "./routes/products.routes.js";
+import { createAuthRouter } from "./modules/auth/auth.routes.js";
+import type { AuthService } from "./modules/auth/auth.service.js";
+import type { ProductRepository } from "./modules/products/product.repository.js";
+import { logger } from "./shared/logger.js";
+import { errorHandler } from "./shared/middleware/errorHandler.js";
+import { notFound } from "./shared/middleware/notFound.js";
+import { healthRouter } from "./modules/health/health.routes.js";
+import { createProductsRouter } from "./modules/products/products.routes.js";
 
 export type AppDeps = {
   productRepo: ProductRepository;
+  authService: AuthService;
 };
 
 export function createApp(deps: AppDeps): Express {
@@ -47,6 +50,7 @@ export function createApp(deps: AppDeps): Express {
 
   // Routers: each one handles one group of URLs.
   app.use("/health", healthRouter);
+  app.use("/auth", createAuthRouter(deps.authService));
   app.use("/products", createProductsRouter(deps.productRepo));
 
   // Test-only routes. Never in production: /slow would let anyone hold

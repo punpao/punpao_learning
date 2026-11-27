@@ -12,7 +12,7 @@ import {
   ScanCommand,
   type DynamoDBDocumentClient,
 } from "@aws-sdk/lib-dynamodb";
-import type { CreateProductInput } from "../schemas/product.schema.js";
+import type { CreateProductInput } from "./products.schema.js";
 import type { Product, ProductRepository } from "./product.repository.js";
 
 export class DynamoProductRepository implements ProductRepository {

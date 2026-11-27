@@ -4,7 +4,7 @@
 //
 // Every method returns a Promise, even though the in-memory version could answer
 // at once: DynamoDB is a network call, so it is async, and the interface must fit both.
-import type { CreateProductInput } from "../schemas/product.schema.js";
+import type { CreateProductInput } from "./products.schema.js";
 
 export type Product = { id: string; name: string; price: number };
 
