@@ -6,6 +6,7 @@ import { Router } from "express";
 import type { Product, ProductRepository } from "./product.repository.js";
 import { requireAuth, requireRole } from "../auth/auth.middleware.js";
 import type { AuthService } from "../auth/auth.service.js";
+import type { EventBus } from "../../shared/events/event.bus.js";
 import { sendProblem } from "../../shared/http/problem.js";
 import type { FileStorage } from "../../shared/storage/file.storage.js";
 import {
@@ -27,6 +28,7 @@ export type ProductResponse = Omit<Product, "imageKey"> & { imageUrl?: string };
 export function createProductsRouter(
   repo: ProductRepository,
   auth: AuthService,
+  eventBus: EventBus,
   fileStorage?: FileStorage, // optional: missing = uploads not configured → 503
 ): Router {
   const router = Router();
@@ -71,7 +73,14 @@ export function createProductsRouter(
       });
       return;
     }
-    res.status(201).json(await toResponse(await repo.create(result.data)));
+    const created = await repo.create(result.data);
+    // Announce it only AFTER the save worked. Build the event field by field,
+    // so a new internal field on Product (like imageKey) can never leak to browsers.
+    eventBus.publish({
+      type: "product.created",
+      product: { id: created.id, name: created.name, price: created.price },
+    });
+    res.status(201).json(await toResponse(created));
   });
 
   // POST /products/:id/image-upload-url: give an admin a presigned S3 URL to upload

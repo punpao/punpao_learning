@@ -2,12 +2,14 @@
 // app.ts builds the app; this file opens the port and handles shutdown.
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { createApp } from "./app.js"; // ".js" even though the file is app.ts (NodeNext rule)
+import { createApp } from "./app.js";
+import { attachWebSocket } from "./realtime/websocket.js"; // ".js" even though the file is app.ts (NodeNext rule)
 import { AuthService } from "./modules/auth/auth.service.js";
 import { InMemoryUserRepository } from "./modules/auth/inMemory.user.repository.js";
 import { DynamoProductRepository } from "./modules/products/dynamo.product.repository.js";
 import { InMemoryProductRepository } from "./modules/products/inMemory.product.repository.js";
 import type { ProductRepository } from "./modules/products/product.repository.js";
+import { InMemoryEventBus } from "./shared/events/event.bus.js";
 import { logger } from "./shared/logger.js";
 import type { FileStorage } from "./shared/storage/file.storage.js";
 import { createUploadS3Client, S3FileStorage } from "./shared/storage/s3.file.storage.js";
@@ -90,11 +92,15 @@ const corsOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:4200")
   .filter((o) => o.length > 0);
 logger.info({ corsOrigins }, "CORS allowed origins");
 
+// One bus for the whole process: routes publish to it, the WebSocket server listens.
+const eventBus = new InMemoryEventBus();
+
 const app = createApp({
   productRepo: createProductRepo(),
   authService: new AuthService(new InMemoryUserRepository(), jwtSecret),
   corsOrigins,
   fileStorage: createFileStorage(),
+  eventBus,
 });
 
 // Express 5 passes listen errors (e.g. EADDRINUSE: port already in use) to this callback.
@@ -105,6 +111,9 @@ const server = app.listen(port, (err?: Error) => {
   }
   logger.info({ port }, "catalog-service listening");
 });
+
+// WebSocket on the SAME server and port, path /ws (see src/realtime/websocket.ts).
+const realtime = attachWebSocket(server, eventBus, logger);
 
 // Graceful shutdown. ECS (and docker stop) sends SIGTERM, waits, then sends SIGKILL.
 // 1. server.close(): stop accepting NEW connections. Idle keep-alive connections
@@ -118,6 +127,10 @@ function shutdown(signal: NodeJS.Signals): void {
   if (shuttingDown) return; // a second signal must not start a second shutdown
   shuttingDown = true;
   logger.info({ signal }, "shutting down: no new connections, finishing in-flight requests");
+
+  // WebSockets first: an open WebSocket is a connection that never "finishes",
+  // so server.close() below would wait for it until the 10 s timer kills us.
+  realtime.close();
 
   server.close((err) => {
     if (err) {

@@ -11,6 +11,7 @@ import { pinoHttp } from "pino-http";
 import { createAuthRouter, type LoginRateLimit } from "./modules/auth/auth.routes.js";
 import type { AuthService } from "./modules/auth/auth.service.js";
 import type { ProductRepository } from "./modules/products/product.repository.js";
+import type { EventBus } from "./shared/events/event.bus.js";
 import { logger } from "./shared/logger.js";
 import type { FileStorage } from "./shared/storage/file.storage.js";
 import { errorHandler } from "./shared/middleware/errorHandler.js";
@@ -28,6 +29,9 @@ export type AppDeps = {
   // Optional: S3 in production (server.ts, when UPLOAD_BUCKET is set), a fake in tests.
   // Missing → POST /products/:id/image-upload-url answers 503.
   fileStorage?: FileStorage;
+  // Where modules announce domain events (e.g. product.created). server.ts passes
+  // the same bus to the WebSocket server, which forwards events to browsers.
+  eventBus: EventBus;
 };
 
 export function createApp(deps: AppDeps): Express {
@@ -79,7 +83,7 @@ export function createApp(deps: AppDeps): Express {
   // Routers: each one handles one group of URLs.
   app.use("/health", healthRouter);
   app.use("/auth", createAuthRouter(deps.authService, deps.loginRateLimit));
-  app.use("/products", createProductsRouter(deps.productRepo, deps.authService, deps.fileStorage));
+  app.use("/products", createProductsRouter(deps.productRepo, deps.authService, deps.eventBus, deps.fileStorage));
 
   // Test-only routes. Never in production: /slow would let anyone hold
   // connections open for 5 s each, and /boom fills the error logs on purpose.

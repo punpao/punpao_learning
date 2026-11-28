@@ -4,6 +4,7 @@
 import { createApp, type AppDeps } from "../src/app.js";
 import { AuthService } from "../src/modules/auth/auth.service.js";
 import { InMemoryUserRepository } from "../src/modules/auth/inMemory.user.repository.js";
+import { InMemoryEventBus } from "../src/shared/events/event.bus.js";
 import { InMemoryProductRepository } from "../src/modules/products/inMemory.product.repository.js";
 
 export const TEST_JWT_SECRET = "test-secret-1234567890";
@@ -19,6 +20,7 @@ export function makeApp(overrides: Partial<AppDeps> = {}) {
     corsOrigins: [ALLOWED_ORIGIN],
     // High limit so normal tests never hit 429. The 429 test passes its own.
     loginRateLimit: { windowMs: 60_000, limit: 1000 },
+    eventBus: new InMemoryEventBus(),
     ...overrides,
   });
 }
